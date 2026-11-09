@@ -19,6 +19,7 @@ import integrix
 SUBMODULES = [
     "_typing",
     "exceptions",
+    "march",
     "rule",
     "scan",
 ]
