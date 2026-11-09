@@ -18,6 +18,7 @@ import integrix
 
 SUBMODULES = [
     "_typing",
+    "adjoint",
     "exceptions",
     "march",
     "rule",
