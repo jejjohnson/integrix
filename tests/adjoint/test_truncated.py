@@ -117,6 +117,21 @@ class TestLength:
             truncated_scan(lambda c, _: (c, c), 1.0, None, k=2)
 
 
+class TestValidation:
+    @pytest.mark.parametrize("k", [0, True])
+    def test_rejects_a_k_that_is_not_a_positive_integer(self, k) -> None:
+        with pytest.raises(ix.ValidationError, match="k >= 1"):
+            truncated_scan(lambda c, x: (c, c), 0.0, jnp.ones(3), k=k)
+
+    def test_rejects_an_input_without_a_step_axis(self) -> None:
+        with pytest.raises(ix.ValidationError, match="leading"):
+            truncated_scan(lambda c, x: (c, c), 0.0, jnp.array(1.0), k=1)
+
+    def test_rejects_a_length_that_disagrees_with_the_inputs(self) -> None:
+        with pytest.raises(ix.ValidationError, match="length=5"):
+            truncated_scan(lambda c, x: (c, c), 0.0, jnp.ones(10), k=1, length=5)
+
+
 class TestTruncated:
     def test_defaults_to_one_step(self) -> None:
         assert Truncated().k == 1

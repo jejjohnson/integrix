@@ -2,9 +2,11 @@
 
 Moved from pipekit-jax (``packages/pipekit-jax/src/pipekit_jax/adjoints.py``
 at pipekit ``7d02d8e``) with its interface unchanged. A truncated rollout cuts
-the gradient through the carry before the last k steps, so reverse mode keeps
-O(k) of the history; for chaotic dynamics it is also a regulariser, since the
-exact adjoint grows like e^{λ_max T}.
+the gradient through the carry before the last k steps, so the backward sweep
+runs only k steps deep through history; for chaotic dynamics that is a
+regulariser, since the exact adjoint grows like e^{λ_max T}. It does not cut
+memory: each step's output keeps its own gradient, so reverse mode still
+stores every step's residuals. `Checkpointed` is the memory saver.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from integrix._src.adjoint._scan import scan_length
 from integrix.exceptions import ValidationError
 
 
@@ -27,6 +30,9 @@ __all__ = [
 
 class Truncated(eqx.Module):
     """The truncated adjoint: gradients flow through the carry of the last k steps.
+
+    For an `AbstractStepper` (a diffrax solve takes `Checkpointed` or a
+    diffrax adjoint instead).
 
     The adjoint option for `integrix.march.run` and the integrix form of
     pipekit-cycle's ``TruncatedAdjoint``; `truncated_scan` is its function
@@ -66,7 +72,9 @@ def truncated_scan[Carry, X, Y](
     through the carry. Each step's own output yₜ still receives gradients with
     respect to that step's inputs; only the flow through history is cut (the
     ROAD-EnKF and truncated-BPTT training regime). ``k ≥ T`` is a plain scan.
-    Forward values are identical to `jax.lax.scan`'s.
+    Forward values are identical to `jax.lax.scan`'s. Memory is not reduced:
+    the cut is applied inside the scan, so reverse mode still stores every
+    step's residuals (`checkpointed_scan` bounds memory).
 
     Args:
         f: The scan body ``(carry, x) -> (carry, y)``.
@@ -81,9 +89,10 @@ def truncated_scan[Carry, X, Y](
         ``(final_carry, ys)``, exactly as `jax.lax.scan` returns them.
 
     Raises:
-        ValueError: If ``k < 1``, or ``xs`` has no leading axis and no
-            ``length`` is given (a `ValidationError`, which is a
-            `ValueError`).
+        ValueError: If ``k`` is not an integer of at least 1, a leaf of ``xs``
+            has no leading axis, the leaves or ``length`` disagree, or there
+            are no stacked inputs and no ``length`` (a `ValidationError`,
+            which is a `ValueError`).
 
     Examples:
         >>> import jax
@@ -96,17 +105,9 @@ def truncated_scan[Carry, X, Y](
         >>> bool(jnp.array_equal(ys, plain))
         True
     """
-    if k < 1:
-        raise ValidationError(f"truncated_scan needs k >= 1; got k={k}.")
-    leaves = jax.tree.leaves(xs)
-    if leaves:
-        steps = leaves[0].shape[0]
-    elif length is not None:
-        steps = length
-    else:
-        raise ValidationError(
-            "truncated_scan needs at least one stacked input in xs, or a length."
-        )
+    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+        raise ValidationError(f"truncated_scan needs k >= 1; got k={k!r}.")
+    steps = scan_length(xs, length, "truncated_scan")
     cutoff = steps - k
 
     def body(carry: Carry, indexed: tuple[Any, X]) -> tuple[Carry, Y]:

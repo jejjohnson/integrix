@@ -75,7 +75,8 @@ def to_diffrax_adjoint(spec: Any) -> dfx.AbstractAdjoint:
         raise ValidationError(
             "TruncatedAdjoint applies to an outer rollout (assimilation cycle "
             "or solver iteration), not to a single ODE/SDE solve — use "
-            "integrix.adjoint.Truncated with integrix.march.run, or "
-            "integrix.adjoint.truncated_scan, at that layer."
+            "integrix.adjoint.Truncated with an AbstractStepper in "
+            "integrix.march.run, or integrix.adjoint.truncated_scan, at that "
+            "layer."
         )
     raise ValidationError(f"Unrecognised adjoint spec: {spec!r}")
