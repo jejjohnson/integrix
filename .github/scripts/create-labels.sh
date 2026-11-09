@@ -59,6 +59,8 @@ create "area:docs"        "1d76db" "Docs + notebooks"
 
 echo "Creating Dependabot / misc labels..."
 create "dependencies" "ededed" "Pull requests that update a dependency file"
+# Runs the slow and integration test tiers on a PR (ci.yml).
+create "ci:full"      "5319e7" "Run the slow and integration test tiers on this PR"
 
 echo "Creating wave:* labels..."
 # One per wave epic (integrix#8 to integrix#13).

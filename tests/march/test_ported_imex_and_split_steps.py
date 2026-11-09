@@ -12,8 +12,13 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from integrix.march import imex_ssp2_step, split_explicit_step
+
+
+# A parity suite ported from another library: the integration tier.
+pytestmark = pytest.mark.integration
 
 
 class TestIMEX_SSP2:

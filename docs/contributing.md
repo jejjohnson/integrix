@@ -237,7 +237,7 @@ Every rule, scan, stepper and estimator is checked the same way, with the helper
 
 The reference problems are $y' = \lambda y$ with $y(T) = y_0 e^{\lambda T}$ for steppers, $\int_0^\pi \sin x \mathrm{d}x = 2$, and $\int_0^1 e^x \mathrm{d}x = e - 1$ for the trapezoid's $O(h^2)$ convergence. A test whose reference is itself approximate states its own tolerance with a comment saying where it comes from. The helpers refuse to run without `jax_enable_x64`, which `tests/conftest.py` turns on for the suite.
 
-The reference libraries (SciPy, quadax) are in the `test` dependency group only, never in the runtime dependencies. A sweep that takes over a second is marked `@pytest.mark.slow`; for a parametrised sweep, mark only the expensive cases with `pytest.param(..., marks=pytest.mark.slow)`. CI runs every tier.
+The reference libraries (SciPy, quadax) are in the `test` dependency group only, never in the runtime dependencies. A sweep that takes over a second is marked `@pytest.mark.slow`; for a parametrised sweep, mark only the expensive cases with `pytest.param(..., marks=pytest.mark.slow)`. A suite ported from another library is the integration tier (`pytestmark = pytest.mark.integration`). Every PR runs the fast tier; the slow and integration tiers run on `main`, nightly, and on a PR labelled `ci:full` ("Test tiers" in `AGENTS.md`).
 
 ## Pre-commit checklist
 
@@ -247,7 +247,7 @@ Run these locally before opening a PR:
 uv run poe format       # ruff format . + ruff check --fix .   (applies changes)
 uv run poe lint         # ruff check .                         (CI-style check)
 uv run poe typecheck    # ty check
-uv run poe test         # pytest
+uv run poe test         # fast tier (uv run poe test-slow for the slow and integration tiers)
 ```
 
 Note that `uv run poe format` **mutates files** — it formats and applies autofixes. `uv run poe lint` is the CI-parity read-only check. Run `uv run poe format` first, commit the result, then run `uv run poe lint` / `uv run poe test` to verify.

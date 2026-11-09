@@ -65,7 +65,7 @@ Skip anything ruff, ty or the tests already enforce (formatting, import order, `
 - Each behaviour is checked against a closed form, a hand computation or a published value; edge cases (a single node, several axes, a descending axis, float32 inputs, invalid arguments) have their own tests. A public forward function has the four `python-style` tests: a reference, hypothesis properties, gradient check, transform invariance.
 - New code is covered (the 90 % gate is global, so a well-covered package can hide an untested module: look at the diff, not the total).
 - Randomness, if any, is seeded; a statistical assertion is bounded by the statistic's own sampling distribution, with the bound's source in a comment.
-- Tier markers right: unmarked under ~1 s, `slow` above, `integration` for end-to-end workflows and optional dependencies.
+- Tier markers right: unmarked under ~1 s, `slow` above (sweeps, long rollouts, property sweeps), `integration` for ported parity suites and end-to-end workflows; the fast tier alone still clears the coverage gate.
 
 ### 5. Modern Python and dependencies
 

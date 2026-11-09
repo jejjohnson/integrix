@@ -50,6 +50,7 @@ In `tests/<area>/test_<name>.py`, with x64 on (from `tests/conftest.py`), using 
 - **Transforms:** `assert_traces` (eager, `jit` and `vmap` agree with a Python loop).
 - **Estimators:** `assert_within_stderr`, never a tolerance tuned on one draw.
 - **Edges:** a single node, several axes, a descending axis, float32 input keeps float32, each invalid argument raises `ValidationError` (`match=` on the argument name).
+- **Tiers** ("Test tiers" in `AGENTS.md`): sweeps (orders, hypothesis, long rollouts, stiff solves) are `@pytest.mark.slow`, a ported parity suite is `integration`, and everything else stays fast; the fast tier alone must still clear the coverage gate.
 
 ## 6. Verify
 

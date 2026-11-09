@@ -124,7 +124,7 @@ Most rules here are tests, so CI tells you when one breaks. Read a test's docstr
 | `--doctest-modules` on `src/integrix` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
 | `tests/test_exceptions.py` | The hierarchy: every error is a `IntegrixError` and its stdlib base |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
-| `[tool.coverage.report] fail_under = 90` | Coverage of `src/integrix` in every coverage-enabled run (CI, `uv run poe test-cov`) |
+| `[tool.coverage.report] fail_under = 90` | Coverage of `src/integrix` in every coverage-enabled run (the fast tier in CI, `uv run poe test-cov`) |
 | `strict_markers = true` | Only the registered tier markers (`slow`, `integration`) exist |
 | ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `src/integrix` and `scripts` |
 
@@ -152,12 +152,14 @@ Always run Python tools through `uv run` (never the system Python); `git`, `ls` 
 ```bash
 uv run poe                  # list every task (they live in [tool.poe.tasks] in pyproject.toml)
 uv run poe install          # uv sync --all-groups + pre-commit hooks
-uv run poe test             # every test + doctests, no coverage (fast)
-uv run poe test-cov         # the same with coverage and the 90 % gate (what CI runs)
+uv run poe test             # fast tier + doctests on every core, no coverage (the inner loop)
+uv run poe test-cov         # the fast tier with coverage and the 90 % gate (what every PR runs)
+uv run poe test-slow        # the slow and integration tiers, where the gates live (main, nightly, `ci:full`)
+uv run poe test-all         # every tier with coverage
 uv run poe lint             # ruff check .   (entire repo)
 uv run poe format           # ruff format . && ruff check --fix .
 uv run poe typecheck        # ty check src/integrix scripts (what CI runs)
-uv run poe check            # lint + format-check + typecheck + test-cov (everything CI checks)
+uv run poe check            # lint + format-check + typecheck + test-cov (what every PR checks)
 uv run poe capabilities     # regenerate docs/api/capabilities.md
 uv run poe docs             # build both docs halves into public/ and check every link
 uv run poe docs-check       # strict validation of both halves, no themed render
@@ -179,11 +181,11 @@ uv run pytest --no-cov tests/test_exceptions.py::test_every_error_derives_from_t
 
 The markers are registered in `pyproject.toml` (`strict_markers = true`):
 
-- **Unmarked (fast):** unit tests and doctests, each well under a second.
-- **`@pytest.mark.slow`:** a test over ~1 s (a large sweep, a long fit). For a parametrised test, mark only the expensive cases (`pytest.param(..., marks=pytest.mark.slow)`).
-- **`@pytest.mark.integration`:** end-to-end workflows, optional dependencies, external tools.
+- **Unmarked (fast):** unit tests and doctests, each well under a second of its own (JAX's first compile of a new shape aside). The fast tier alone must keep coverage above the 90 % gate.
+- **`@pytest.mark.slow`:** a test over ~1 s of its own: an order-of-accuracy sweep, a long rollout (10⁴ steps, a 10⁵-point spectrum), a hypothesis property sweep, a stiff solve. For a parametrised test, mark only the expensive cases (`pytest.param(..., marks=pytest.mark.slow)`). The gates (G0-exact, G0-scipy, G1-order, …) mostly live here.
+- **`@pytest.mark.integration`:** parity with another library's suite (every `tests/**/test_ported_*.py` sets `pytestmark = pytest.mark.integration`), end-to-end workflows, external tools.
 
-CI ("Tests", `ci.yml`) runs every tier with coverage on Python 3.12 and 3.13 (`uv run pytest -v`). Select the fast tier with `uv run pytest -m "not slow and not integration"`; when the slow tiers grow, give them a CI job of their own rather than dropping them.
+CI ("Tests", `ci.yml`) runs the fast tier with coverage on every PR, whatever its base, so a stacked PR is tested too: `uv run pytest -n auto -m "not slow and not integration"`, on Python 3.12 and 3.13. The slow and integration tiers run in a job of their own (`uv run pytest -n auto --no-cov -m "slow or integration"`) on every push to `main`, nightly, on demand, and on a PR labelled `ci:full`; add that label to a PR that changes a scheme, a gate or a ported suite. Both jobs run on every core with pytest-xdist and keep JAX's persistent compilation cache between runs, since most of the suite's time is XLA compiling small programs. A new test goes into the cheapest tier that still checks what it must: a gate that needs a sweep is slow, the smoke test beside it is fast.
 
 ### Tests that assert on random draws
 
@@ -196,7 +198,7 @@ integrix's tests draw random nodes, samples and integrands, and the expectation 
 
 All of these must pass, from the repo root:
 
-1. `uv run poe test`: zero failures (doctests included).
+1. `uv run poe test`: zero failures (doctests included); after changing a scheme, a gate or a ported suite, `uv run poe test-slow` too.
 2. `uv run --group lint ruff check .`: the **entire** repo, which includes `tests/`, `scripts/` and the code cells of `docs/notebooks/*.ipynb`. Never lint a subdirectory: `ruff check src/integrix/` misses errors CI catches.
 3. `uv run --group lint ruff format --check .`
 4. `uv run poe typecheck` (`ty check src/integrix scripts`, as CI runs it).

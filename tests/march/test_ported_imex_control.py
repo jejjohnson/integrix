@@ -17,6 +17,10 @@ import pytest
 from integrix.march import imex_solver, imex_stepsize_controller, stable_step
 
 
+# A parity suite ported from another library: the integration tier.
+pytestmark = pytest.mark.integration
+
+
 class TestImexSolverConstruction:
     def test_solver_is_kencarp_with_matrix_free_newton(self) -> None:
         solver = imex_solver()

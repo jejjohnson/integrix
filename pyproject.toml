@@ -43,6 +43,8 @@ Repository = "https://github.com/jejjohnson/integrix"
 dev = [
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
+    # Runs the suite on every core: most of its time is XLA compiling.
+    "pytest-xdist>=3.6",
     "pre-commit>=4.7.0",
     "poethepoet>=0.49.0",
     "cyclopts>=5.3.3",
@@ -139,11 +141,13 @@ testpaths = ["tests", "src/integrix"]
 # tests/ is importable from every test file, for the shared helpers in
 # tests/_harness.py ("Testing a procedure" in docs/contributing.md).
 pythonpath = ["tests"]
-# Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
+# Test tiers (see "Test tiers" in AGENTS.md). Every PR runs the fast tier
+# (unmarked); the slow and integration tiers run on main, nightly, and on a PR
+# labelled `ci:full`.
 strict_markers = true
 markers = [
-    "slow: takes over ~1 s; deselect with -m 'not slow'",
-    "integration: end-to-end workflows, optional dependencies, external tools",
+    "slow: over ~1 s of its own: order sweeps, long rollouts, property sweeps",
+    "integration: parity with another library's suite (the ported tests), end-to-end workflows, external tools",
 ]
 addopts = """\
     --doctest-modules \
@@ -245,15 +249,23 @@ cmd = "uv run --group typecheck ty check ${PKGROOT} ${TYPECHECK_EXTRA}"
 # --- Testing ----------------------------------------------------------------
 
 [tool.poe.tasks.test]
-help = "Run tests + doctests (no coverage, fast)"
-cmd = "uv run pytest -v -o addopts=--doctest-modules"
+help = "Fast tier + doctests on every core, no coverage (the inner loop)"
+cmd = "uv run pytest -n auto -o addopts=--doctest-modules -m 'not slow and not integration'"
 
 [tool.poe.tasks.test-cov]
-help = "Run tests with coverage and the 90 % gate (what CI runs)"
-cmd = "uv run pytest -v"
+help = "Fast tier with coverage and the 90 % gate (what every PR runs)"
+cmd = "uv run pytest -n auto -m 'not slow and not integration'"
+
+[tool.poe.tasks.test-slow]
+help = "Slow and integration tiers: the gates (what main and nightly run)"
+cmd = "uv run pytest -n auto --no-cov -m 'slow or integration'"
+
+[tool.poe.tasks.test-all]
+help = "Every tier with coverage, on every core"
+cmd = "uv run pytest -n auto"
 
 [tool.poe.tasks.check]
-help = "Everything CI checks: lint, format-check, typecheck, test-cov"
+help = "What every PR checks: lint, format-check, typecheck, test-cov"
 sequence = ["lint", "format-check", "typecheck", "test-cov"]
 
 # --- Pre-commit -------------------------------------------------------------

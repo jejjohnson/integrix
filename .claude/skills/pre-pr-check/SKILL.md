@@ -13,10 +13,11 @@ Run from the repo root and fix what fails before committing. Report results hone
 uv run --group lint ruff check .          # entire repo: tests/, scripts/, notebook cells
 uv run --group lint ruff format --check .
 uv run poe typecheck                            # ty on src/integrix and scripts (what CI runs)
-uv run poe test-cov                             # every test + doctests, with the 90 % coverage gate (what CI runs)
+uv run poe test-cov                             # fast tier + doctests, with the 90 % coverage gate (what every PR runs)
+uv run poe test-slow                            # slow and integration tiers (the gates); needed when a scheme, a gate or a ported suite changed
 ```
 
-`uv run poe test` is the same suite without coverage, for quick iterations. For a part of the suite, pass `--no-cov` (a subset never reaches the gate): `uv run pytest --no-cov tests/<file>.py`.
+`uv run poe test` is the fast tier without coverage, for quick iterations. A PR that changes a scheme, a gate or a ported suite gets the `ci:full` label so CI runs the slow and integration tiers on it too. For a part of the suite, pass `--no-cov` (a subset never reaches the gate): `uv run pytest --no-cov tests/<file>.py`.
 
 ## When the public API changed
 

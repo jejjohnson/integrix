@@ -3,8 +3,8 @@ name: Lint & Format
 on:
   push:
     branches: [main]
+  # Every PR, whatever its base, so a stacked PR is checked too.
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read

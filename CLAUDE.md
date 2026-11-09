@@ -15,6 +15,6 @@ The rules for every agent live in `AGENTS.md`; this file adds only what is speci
 - **Subagents** (`.claude/agents/`), both read-only, both used by `integrix-review`; run them on any diff that adds code, before committing:
   - `reuse-reviewer`: does the diff re-implement something in `docs/api/capabilities.md` or a shared private helper?
   - `numerics-reviewer`: the dtype of weights, pairwise sums, order-of-accuracy slopes, stability limits, guarded `where` branches, static shapes and reference tolerances.
-- **Partial test runs** need `--no-cov` (`addopts` turns coverage on and its 90 % gate fails any subset).
+- **Partial test runs** need `--no-cov` (`addopts` turns coverage on and its 90 % gate fails any subset). `uv run poe test` is the fast tier on every core; `uv run poe test-slow` runs the slow and integration tiers ("Test tiers" in `AGENTS.md`).
 - **GitHub.** GraphQL is blocked in Claude sessions, so issues, sub-issue and blocked-by links go through REST (`gh api repos/...`, as `create-gh-issue`, `link-gh-issues` and `.github/scripts/link-issues.sh` do). When the `gh` CLI is unavailable, use the GitHub MCP tools for the same operations (PRs, issues, review threads, check runs).
 - **Commits.** No `Co-Authored-By: Claude` trailer and no "Generated with Claude Code" line, unless the maintainer asks.
