@@ -19,6 +19,7 @@ import integrix
 SUBMODULES = [
     "_typing",
     "exceptions",
+    "rule",
 ]
 
 # Packages: the public area modules that are packages, and the private tree.

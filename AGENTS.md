@@ -16,7 +16,7 @@ It is one package, `src/integrix/`. Logic lives in `integrix._src.<area>`, and e
 
 | Module | Owns | Lands in |
 |---|---|---|
-| `_typing.py` | PEP 695 aliases shared across areas | #14 |
+| `_typing.py` | PEP 695 aliases and protocols shared across areas (`Axes`, `RuleLike`) | #14, #16 |
 | `exceptions.py` | `IntegrixError` and its subclass `ValidationError` (also a `ValueError`) | #14 |
 | `rule` | `Integral`, `integrate` and `weighted_mean`: weights against samples over one axis or several | Wave 0 (#16) |
 | `scan` | `cumulative`: running integrals, forward and reverse, by `associative_scan` | Wave 0 (#17) |
@@ -64,6 +64,9 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 |---|---|
 | Trapezoid, Simpson, Gauss–Legendre or Clenshaw–Curtis nodes and weights | functax's rules (`functax.quad`, functax#44); never a private copy here |
 | Gauss–Hermite, unscented or sigma-point expectations | gaussx |
+| `jnp.trapezoid`, `np.trapz`, `jnp.sum(w * f)`, a weighted mean over a band | `integrix.rule.integrate` and `weighted_mean`, with a functax rule or a weights array |
+| A long sum written left to right | `pairwise_sum` (`integrix._src.rule._pairwise`) |
+| A class with `nodes` and `weights` to pass a rule in | `RuleLike` (`integrix._typing`), which functax's `Rule` satisfies structurally |
 | A new exception for bad input | `ValidationError` |
 | `jnp.linalg.solve`, `jnp.linalg.inv`, a hand-rolled Newton or CG | lineax, optimistix or gaussx |
 | A time-stepping loop around a diffrax solver | `diffrax.diffeqsolve` |
