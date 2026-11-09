@@ -7,6 +7,7 @@ import integrix as ix
 
 ix.IntegrixError  # the base of every integrix error
 ix.rule.integrate  # weights against samples
+ix.scan.cumulative  # running integrals
 ```
 
 The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each, together with the public API of JAX, Equinox, diffrax, lineax, optimistix, einx, functax and gaussx.
@@ -16,6 +17,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | Module | Contents |
 |---|---|
 | [Rules](rule.md) | `Integral`, `integrate`, `weighted_mean`: weights against samples over any axes (Wave 0) |
+| [Scans](scan.md) | `cumulative`: running integrals, forward and reverse, by associative scan (Wave 0) |
 | [Type aliases](typing.md) | `Axes`, `RuleLike` |
 | [Exceptions](exceptions.md) | `IntegrixError`, `ValidationError` |
 

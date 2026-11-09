@@ -20,6 +20,7 @@ SUBMODULES = [
     "_typing",
     "exceptions",
     "rule",
+    "scan",
 ]
 
 # Packages: the public area modules that are packages, and the private tree.

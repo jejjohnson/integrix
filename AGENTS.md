@@ -66,6 +66,8 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 | Gauss–Hermite, unscented or sigma-point expectations | gaussx |
 | `jnp.trapezoid`, `np.trapz`, `jnp.sum(w * f)`, a weighted mean over a band | `integrix.rule.integrate` and `weighted_mean`, with a functax rule or a weights array |
 | A long sum written left to right | `pairwise_sum` (`integrix._src.rule._pairwise`) |
+| `cumulative_trapezoid`, a `cumsum` of trapezoid increments, optical depth from the top | `integrix.scan.cumulative` (with `reverse=True` from the far end) |
+| Moving axes first, flattening node axes, normalising `axis` | `normalise_axes`, `nodes_first`, `move_first`, `move_back` (`integrix._src._axes`) |
 | A class with `nodes` and `weights` to pass a rule in | `RuleLike` (`integrix._typing`), which functax's `Rule` satisfies structurally |
 | A new exception for bad input | `ValidationError` |
 | `jnp.linalg.solve`, `jnp.linalg.inv`, a hand-rolled Newton or CG | lineax, optimistix or gaussx |
