@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+import operator
 from typing import Any
 
 import jax
 import numpy as np
 
 from integrix.exceptions import ValidationError
+
+
+def positive_count(value: Any, name: str) -> int:
+    """``value`` as a positive Python integer (not a bool), else `ValidationError`."""
+    if isinstance(value, bool):
+        raise ValidationError(f"'{name}' must be a positive integer, got {value!r}")
+    try:
+        count = operator.index(value)
+    except TypeError as err:
+        raise ValidationError(
+            f"'{name}' must be a positive integer, got {value!r}"
+        ) from err
+    if count < 1:
+        raise ValidationError(f"'{name}' must be a positive integer, got {value!r}")
+    return count
 
 
 def scan_length(xs: Any, length: int | None, caller: str) -> int:

@@ -20,6 +20,9 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree, ScalarLike
 
+from integrix._src.adjoint._checkpoint import Checkpointed, checkpointed_scan
+from integrix._src.adjoint._diffrax import to_diffrax_adjoint
+from integrix._src.adjoint._truncated import Truncated, truncated_scan
 from integrix.exceptions import ValidationError
 
 
@@ -109,7 +112,7 @@ def run(
     *,
     args: Any = None,
     saveat: dfx.SaveAt | None = None,
-    adjoint: dfx.AbstractAdjoint | None = None,
+    adjoint: Any = None,
 ) -> PyTree:
     """March y₀ through ``n_steps`` constant steps of h from t₀.
 
@@ -135,10 +138,16 @@ def run(
         args: Passed to the vector field.
         saveat: ``None`` for the final state y_N, or ``SaveAt(steps=True)``
             for every state y₁, …, y_N, stacked on a new leading axis.
-        adjoint: A diffrax adjoint, for a diffrax solver only. The loop of an
-            `AbstractStepper` differentiates by reverse-mode through
-            `jax.lax.scan`; integrix's checkpointed and truncated adjoints
-            for it arrive with #22 and #23.
+        adjoint: How reverse mode runs back through the march. ``None`` is
+            plain reverse mode (every state stored for a stepper; diffrax's
+            default for a solver). `integrix.adjoint.Checkpointed` stores
+            every k-th state and recomputes between (for a diffrax solver,
+            ``RecursiveCheckpointAdjoint(checkpoints=⌈N / k⌉)``).
+            `integrix.adjoint.Truncated` cuts the gradient through the state
+            before the last k steps, for a stepper only. A diffrax solver
+            also takes a diffrax adjoint or a pipekit-cycle spec
+            (`integrix.adjoint.to_diffrax_adjoint`). Forward values never
+            depend on the adjoint.
 
     Returns:
         y_N, or the stacked y₁, …, y_N.
@@ -146,7 +155,9 @@ def run(
     Raises:
         ValidationError: If ``n_steps`` is not a positive integer, ``saveat``
             asks for anything but the final state or every step, ``adjoint``
-            is given for an `AbstractStepper`, or ``stepper`` is neither kind.
+            does not apply to the stepper (`Truncated` for a diffrax solve, a
+            diffrax adjoint for an `AbstractStepper`), or ``stepper`` is
+            neither kind.
 
     Examples:
         >>> import jax.numpy as jnp
@@ -188,18 +199,18 @@ def run(
             f"'stepper' must be an AbstractStepper or a diffrax solver, got "
             f"{type(stepper).__name__}"
         )
-    if adjoint is not None:
-        raise ValidationError(
-            "'adjoint' applies to a diffrax solver only; an AbstractStepper's "
-            "loop differentiates through jax.lax.scan (integrix's checkpointed "
-            "and truncated adjoints arrive with #22 and #23)"
-        )
+    scan = _loop_scan(adjoint, n_steps)
 
     time_dtype = state_time_dtype(y0)
     start = jnp.asarray(t0, dtype=time_dtype)
     step_size = jnp.asarray(dt, dtype=time_dtype)
 
     state, y1 = stepper.init(rhs, start, y0, step_size, args)
+    # y₁ as saved: its own step's gradient survives any truncation
+    y1_saved = y1
+    if isinstance(adjoint, Truncated) and adjoint.k < n_steps:
+        # the first step lies before the last k, so the carry it hands on is cut
+        y1, state = jax.lax.stop_gradient((y1, state))
 
     def body(carry, index):
         y, history = carry
@@ -209,11 +220,11 @@ def run(
         return (y_next, history), (y_next if save_steps else None)
 
     indices = jnp.arange(1, n_steps)
-    (y_final, _), later = jax.lax.scan(body, (y1, state), indices)
+    (y_final, _), later = scan(body, (y1, state), indices)
     if not save_steps:
         return y_final
     return jax.tree.map(
-        lambda first, rest: jnp.concatenate([first[None], rest]), y1, later
+        lambda first, rest: jnp.concatenate([first[None], rest]), y1_saved, later
     )
 
 
@@ -256,7 +267,7 @@ def _run_diffrax(
     n_steps: int,
     args: Any,
     save_steps: bool,
-    adjoint: dfx.AbstractAdjoint | None,
+    adjoint: Any,
 ) -> PyTree:
     """``diffeqsolve`` on the N + 1 step times t₀ + n h."""
     terms = rhs if isinstance(rhs, dfx.AbstractTerm) else dfx.ODETerm(rhs)
@@ -265,7 +276,7 @@ def _run_diffrax(
     start = jnp.asarray(t0, dtype=time_dtype)
     step_size = jnp.asarray(dt, dtype=time_dtype)
     step_times = start + step_size * jnp.arange(n_steps + 1, dtype=time_dtype)
-    options = {} if adjoint is None else {"adjoint": adjoint}
+    options = {} if adjoint is None else {"adjoint": _diffrax_adjoint(adjoint, n_steps)}
     solution = dfx.diffeqsolve(
         terms,
         solver,
@@ -282,3 +293,45 @@ def _run_diffrax(
     if save_steps:
         return solution.ys
     return jax.tree.map(lambda saved: saved[0], solution.ys)
+
+
+def _loop_scan(adjoint: Any, n_steps: int) -> Callable[..., Any]:
+    """The scan the `AbstractStepper` loop runs, for the chosen adjoint."""
+    if adjoint is None:
+        return jax.lax.scan
+    if isinstance(adjoint, Checkpointed):
+        every = adjoint.every
+
+        def scan(body, carry, xs):
+            return checkpointed_scan(body, carry, xs, every=every)
+
+        return scan
+    if isinstance(adjoint, Truncated):
+        # the loop scans N − 1 steps after init; the last k of N are live
+        k = adjoint.k
+
+        def scan(body, carry, xs):
+            if k >= n_steps:
+                return jax.lax.scan(body, carry, xs)
+            return truncated_scan(body, carry, xs, k=k)
+
+        return scan
+    raise ValidationError(
+        f"'adjoint' for an AbstractStepper must be None, Checkpointed or "
+        f"Truncated, got {type(adjoint).__name__} (a diffrax adjoint applies to "
+        f"a diffrax solver only)"
+    )
+
+
+def _diffrax_adjoint(adjoint: Any, n_steps: int) -> dfx.AbstractAdjoint:
+    """The diffrax adjoint for a solver: Checkpointed maps, Truncated refuses."""
+    if isinstance(adjoint, Truncated):
+        raise ValidationError(
+            "'adjoint' Truncated needs an AbstractStepper; a diffrax solver takes "
+            "Checkpointed, a diffrax adjoint or a pipekit-cycle spec (truncation "
+            "belongs to an outer rollout, not to a single solve)"
+        )
+    if isinstance(adjoint, Checkpointed):
+        # diffrax counts checkpoints rather than spacing them: ⌈N / k⌉
+        return dfx.RecursiveCheckpointAdjoint(checkpoints=-(-n_steps // adjoint.every))
+    return to_diffrax_adjoint(adjoint)
