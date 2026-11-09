@@ -21,5 +21,5 @@ Every error integrix raises derives from [`IntegrixError`](xref:api#integrix.Int
 ```python
 import integrix as ix
 
-ix.__version__  # '0.0.1'
+ix.__version__  # a version string such as '0.0.2'
 ```

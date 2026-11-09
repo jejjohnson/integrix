@@ -44,6 +44,7 @@ In `tests/march/test_<family>.py`, with x64 on, using `tests/_harness.py`:
 - **Stability:** one step size inside the stated limit stays bounded and one outside grows, on the linear test problem.
 - **Transforms and gradients:** `assert_traces` for `jit` and `vmap`; `assert_grad_matches_fd` through a short march.
 - **Edges:** a pytree state, float32 state keeps float32, each invalid configuration raises `ValidationError`.
+- **Tiers** ("Test tiers" in `AGENTS.md`): sweeps (orders, hypothesis, long rollouts, stiff solves) are `@pytest.mark.slow`, a ported parity suite is `integration`, and everything else stays fast; the fast tier alone must still clear the coverage gate.
 
 ## 6. Verify
 

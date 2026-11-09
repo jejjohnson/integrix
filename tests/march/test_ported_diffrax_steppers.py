@@ -29,6 +29,10 @@ from integrix.march import (
 )
 
 
+# A parity suite ported from another library: the integration tier.
+pytestmark = pytest.mark.integration
+
+
 def _decay_rhs(t, y, args):
     """dy/dt = -y."""
     return -y

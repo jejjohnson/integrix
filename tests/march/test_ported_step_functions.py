@@ -25,6 +25,10 @@ from integrix.march import (
 )
 
 
+# A parity suite ported from another library: the integration tier.
+pytestmark = pytest.mark.integration
+
+
 def _exponential_decay(y):
     """dy/dt = -y  =>  y(t) = y0 * exp(-t)."""
     return jax.tree.map(lambda x: -x, y)

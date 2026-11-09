@@ -14,7 +14,7 @@ The essentials, in case you only read this file:
 The rules for every project:
 
 - Every docstring `Examples:` block runs (`--doctest-modules`): the expected output must be what the code prints.
-- Before committing, from the repo root: `uv run poe test`, `uv run --group lint ruff check .`, `uv run --group lint ruff format --check .`, `uv run poe typecheck`; `uv run poe capabilities` after a public API change. Lint the whole repo, never a subdirectory.
+- Before committing, from the repo root: `uv run poe test` (the fast tier; `uv run poe test-slow` after changing a scheme, gate or ported suite), `uv run --group lint ruff check .`, `uv run --group lint ruff format --check .`, `uv run poe typecheck`; `uv run poe capabilities` after a public API change. Lint the whole repo, never a subdirectory.
 - When you suggest a change, propose the code; when you fix a bug, add the test that reproduces it. Don't nitpick what ruff and the formatter handle.
 - House style ("House style" in `AGENTS.md`): the maintainer's `python-style` for Python (comments above the line, a Unicode equation above each mathematical line, descriptive names), `eman-style-math` for maths (Unicode in code and docstrings, macros in MyST and MkDocs pages), `cyclopts` and `loguru` for new CLIs and scripts, Markdown never hard-wrapped, Mermaid rather than ASCII diagrams.
 - Partial test runs need `--no-cov` (the 90 % coverage gate fails a subset).

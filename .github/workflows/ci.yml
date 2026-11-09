@@ -1,16 +1,40 @@
 name: Tests
 
+# Three tiers ("Test tiers" in AGENTS.md). Every PR, whatever its base (so a
+# stacked PR is tested too), runs the fast tier: unit tests and doctests, with
+# the 90 % coverage gate. The slow tier (order sweeps, long rollouts, property
+# sweeps) and the integration tier (ported parity suites) run on every push to
+# main, nightly, on demand, and on a PR labelled `ci:full`.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  # Adding the `ci:full` label starts its own run, which must not cancel the
+  # fast run of the same commit.
+  group: tests-${{ github.ref }}-${{ github.event.action == 'labeled' && 'labeled' || 'push' }}
+  cancel-in-progress: true
+
+env:
+  # JAX's persistent compilation cache: most of the suite's time is XLA
+  # compiling small programs, and the cache survives between runs.
+  JAX_COMPILATION_CACHE_DIR: ${{ github.workspace }}/.jax-cache
+  JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS: "0"
+  JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES: "0"
+
 jobs:
-  test:
+  fast:
+    name: fast (${{ matrix.python-version }})
+    # Adding the `ci:full` label starts the full job only; nothing here re-runs.
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -22,8 +46,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: uv sync --group dev
-      - name: Run tests with coverage
-        run: uv run pytest -v
+      - uses: actions/cache@v6
+        with:
+          path: .jax-cache
+          key: jax-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}-fast-${{ github.run_id }}
+          restore-keys: |
+            jax-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}-fast-
+            jax-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}-
+      - name: Fast tier with coverage
+        run: uv run pytest -n auto -m "not slow and not integration"
       - name: Upload coverage report
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v7
@@ -37,9 +68,36 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
+  full:
+    name: slow and integration
+    if: >-
+      github.event_name != 'pull_request'
+      || (contains(github.event.pull_request.labels.*.name, 'ci:full')
+          && (github.event.action != 'labeled' || github.event.label.name == 'ci:full'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: uv sync --group dev
+      - uses: actions/cache@v6
+        with:
+          path: .jax-cache
+          key: jax-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}-full-${{ github.run_id }}
+          restore-keys: |
+            jax-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}-full-
+            jax-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}-
+      # The gates (G0-exact, G0-scipy, G1-order, G1-port, …) live here; the
+      # fast tier already measured coverage, so this run does not.
+      - name: Slow and integration tiers
+        run: uv run pytest -n auto --no-cov -m "slow or integration"
+
   # A bare install (no test group) must not pull in the test-only references,
   # and integrix must import there. SciPy is not checked: JAX depends on it.
   base-install:
+    if: github.event.action != 'labeled'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

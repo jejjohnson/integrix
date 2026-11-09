@@ -133,6 +133,7 @@ class TestImexSolver:
         # local error control at 1e-8: a global error well under 1e-5
         assert float(np.max(np.abs(np.asarray(solution.ys[0]) - exact))) < 1e-5
 
+    @pytest.mark.slow
     def test_runs_through_run_with_a_multi_term(self) -> None:
         terms = dfx.MultiTerm(
             dfx.ODETerm(lambda t, y, args: -y), dfx.ODETerm(lambda t, y, args: -5 * y)

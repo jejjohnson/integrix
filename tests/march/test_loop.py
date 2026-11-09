@@ -65,6 +65,7 @@ class TestRunDispatchesToDiffrax:
         final = run(RK3SSP(), _decay, 0.0, jnp.ones(2), 0.1, 7)
         assert_matches_scipy(every[-1], final, rtol=1e-15)
 
+    @pytest.mark.slow
     def test_takes_a_diffrax_term_for_imex(self) -> None:
         terms = dfx.MultiTerm(
             dfx.ODETerm(lambda t, y, args: -y), dfx.ODETerm(lambda t, y, args: -10 * y)
@@ -74,6 +75,7 @@ class TestRunDispatchesToDiffrax:
         solution = dfx.diffeqsolve(terms, solver, 0.0, 1.0, 0.01, jnp.array(1.0))
         assert_matches_scipy(y, solution.ys[0], rtol=1e-12)
 
+    @pytest.mark.slow
     def test_passes_a_diffrax_adjoint_through(self) -> None:
         def final(y0: jax.Array) -> jax.Array:
             return run(
@@ -321,7 +323,13 @@ class TestTime:
 class TestTransforms:
     @pytest.mark.parametrize(
         "stepper",
-        [AB2Solver(), LeapfrogRAFSolver(alpha=0.05), RK3SSP()],
+        [
+            AB2Solver(),
+            LeapfrogRAFSolver(alpha=0.05),
+            # diffrax under jit(vmap) compiles for ~3 s; the fast tier keeps the
+            # integrix loop and test_final_state_equals_diffeqsolve covers the path
+            pytest.param(RK3SSP(), marks=pytest.mark.slow),
+        ],
         ids=["ab2", "leapfrog_raf", "rk3_ssp"],
     )
     def test_jit_and_vmap_agree_with_a_loop(self, stepper) -> None:
