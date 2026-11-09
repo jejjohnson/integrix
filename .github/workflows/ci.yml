@@ -18,7 +18,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
+  # Adding the `ci:full` label starts its own run, which must not cancel the
+  # fast run of the same commit.
+  group: tests-${{ github.ref }}-${{ github.event.action == 'labeled' && 'labeled' || 'push' }}
   cancel-in-progress: true
 
 env:
