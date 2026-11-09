@@ -72,6 +72,7 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 | A new exception for bad input | `ValidationError` |
 | `jnp.linalg.solve`, `jnp.linalg.inv`, a hand-rolled Newton or CG | lineax, optimistix or gaussx |
 | A time-stepping loop around a diffrax solver | `diffrax.diffeqsolve` |
+| An SSP-RK, RK4, IMEX or Adams–Bashforth step, a Butcher tableau | `integrix.march` (`RK3SSP`, `SSP_RK104`, `IMEX_SSP2`, `AB3Solver`, … and `rk3_ssp_step`, `imex_ssp2_step`, …) |
 | `x.T`, `x.reshape(...)`, `x[:, None]`, `jnp.sum(x, axis=…)` | `einx.rearrange`, `einx.sum` and friends |
 
 ## The contracts
@@ -103,7 +104,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 
 ### The public API
 
-- Logic lives in `integrix._src.<area>`; the public area module only re-exports, from its own sorted `__all__`. The top-level `integrix.__all__` holds only the exceptions and `__version__`; both stay sorted (ruff's `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
+- Logic lives in `integrix._src.<area>`; the public area module only re-exports, from its own sorted `__all__`. The top-level `integrix.__all__` holds only the exceptions and `__version__`; both stay sorted (ruff's `RUF022` and `test_all_is_sorted_and_unique` agree on the order, except when SCREAMING_CASE names such as `IMEX_SSP2` appear: `integrix.march` keeps plain `sorted()` order under a `# noqa: RUF022`).
 - A new top-level module joins `SUBMODULES` (a subpackage joins `SUBPACKAGES`) in `tests/test_public_api.py`, and gets its own page in `docs/api/` (a `::: integrix.<module>` block), a `nav` entry in `mkdocs.yml` and a row in `docs/api/index.md`; a name on an existing module's page is picked up by its `:::` block.
 - Run `uv run poe capabilities` after any public API change.
 - Link prose to the API by the public name (``[`IntegrixError`](xref:api#integrix.IntegrixError)``), see "Documentation".
