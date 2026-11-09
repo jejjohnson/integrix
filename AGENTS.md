@@ -73,6 +73,8 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 | `jnp.linalg.solve`, `jnp.linalg.inv`, a hand-rolled Newton or CG | lineax, optimistix or gaussx |
 | A time-stepping loop around a diffrax solver | `diffrax.diffeqsolve` |
 | An SSP-RK, RK4, IMEX or Adams–Bashforth step, a Butcher tableau | `integrix.march` (`RK3SSP`, `SSP_RK104`, `IMEX_SSP2`, `AB3Solver`, … and `rk3_ssp_step`, `imex_ssp2_step`, …) |
+| A `lax.scan` loop for a multistep, leapfrog or split-explicit scheme, history kept on a module | `integrix.march.AbstractStepper` and `run` (`AB2Solver`, `LeapfrogRAFSolver`, `SplitExplicitRKSolver`) |
+| Time in a state's float precision | `state_time_dtype` (`integrix._src.march._loop`) |
 | `x.T`, `x.reshape(...)`, `x[:, None]`, `jnp.sum(x, axis=…)` | `einx.rearrange`, `einx.sum` and friends |
 
 ## The contracts

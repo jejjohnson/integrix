@@ -121,7 +121,7 @@ lines-after-imports = 2
 "tests/**" = ["B011"]
 # Tests ported verbatim from another library for a parity gate (G1-port) keep
 # their bodies unchanged, including its `int(round(...))` idiom.
-"tests/**/test_ported_*.py" = ["B011", "RUF046"]
+"tests/**/test_ported_*.py" = ["B011", "E501", "RUF046"]
 
 [tool.ruff.format]
 # Format the code inside ``Examples:`` doctest blocks like real source.
