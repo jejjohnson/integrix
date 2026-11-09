@@ -7,7 +7,9 @@ IMEX-SSP2 and AB3 (whose history lives in the solver state). The schemes that
 carry history between steps (AB2, leapfrog with a Robert–Asselin filter, and
 split-explicit) are `AbstractStepper`s, run by `run` with the history in the
 loop carry; `run` also takes the diffrax solvers. Each scheme comes with its
-pure step function for an autonomous right-hand side f(y).
+pure step function for an autonomous right-hand side f(y). `imex_solver`,
+`imex_stepsize_controller` and `stable_step` (moved from sesmax-core) give a
+matrix-free IMEX solve, its step control and the explicit CFL bound.
 """
 
 from __future__ import annotations
@@ -25,6 +27,11 @@ from integrix._src.march._erk import (
     rk4_step,
 )
 from integrix._src.march._imex import IMEX_SSP2, imex_ssp2_step
+from integrix._src.march._imex_control import (
+    imex_solver,
+    imex_stepsize_controller,
+    stable_step,
+)
 from integrix._src.march._loop import AbstractStepper, run
 from integrix._src.march._multistep import (
     AB2Solver,
@@ -61,10 +68,13 @@ __all__ = [  # noqa: RUF022
     "ab3_step",
     "euler_step",
     "heun_step",
+    "imex_solver",
     "imex_ssp2_step",
+    "imex_stepsize_controller",
     "leapfrog_raf_step",
     "rk3_ssp_step",
     "rk4_step",
     "run",
     "split_explicit_step",
+    "stable_step",
 ]

@@ -16,7 +16,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 
 | Module | Contents |
 |---|---|
-| [Marches](march.md) | the diffrax-solver steppers (Euler, Heun, SSP-RK2/3, RK4, SSP-RK(10,4), IMEX-SSP2, AB3), `AbstractStepper` and `run` for AB2, leapfrog-RAF and split-explicit, and their step functions (Wave 1) |
+| [Marches](march.md) | the diffrax-solver steppers (Euler, Heun, SSP-RK2/3, RK4, SSP-RK(10,4), IMEX-SSP2, AB3), `AbstractStepper` and `run` for AB2, leapfrog-RAF and split-explicit, their step functions, and the matrix-free IMEX solver, its step control and the CFL bound (Wave 1) |
 | [Rules](rule.md) | `Integral`, `integrate`, `weighted_mean`: weights against samples over any axes (Wave 0) |
 | [Scans](scan.md) | `cumulative`: running integrals, forward and reverse, by associative scan (Wave 0) |
 | [Type aliases](typing.md) | `Axes`, `RuleLike` |
