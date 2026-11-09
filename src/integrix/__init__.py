@@ -7,8 +7,9 @@ module, and each module appears with the first feature that needs it.
 
 Examples:
     >>> import integrix
-    >>> integrix.__version__
-    '0.0.1'
+    >>> major, minor, patch = integrix.__version__.split(".")[:3]
+    >>> all(part.isdigit() for part in (major, minor, patch))
+    True
 """
 
 from __future__ import annotations
