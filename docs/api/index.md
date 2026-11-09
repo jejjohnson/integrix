@@ -6,6 +6,7 @@ Everything listed in `integrix.__all__` is importable from the top level, and ea
 import integrix as ix
 
 ix.IntegrixError  # the base of every integrix error
+ix.rule.integrate  # weights against samples
 ```
 
 The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each, together with the public API of JAX, Equinox, diffrax, lineax, optimistix, einx, functax and gaussx.
@@ -14,7 +15,8 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 
 | Module | Contents |
 |---|---|
-| [Type aliases](typing.md) | `Axes` |
+| [Rules](rule.md) | `Integral`, `integrate`, `weighted_mean`: weights against samples over any axes (Wave 0) |
+| [Type aliases](typing.md) | `Axes`, `RuleLike` |
 | [Exceptions](exceptions.md) | `IntegrixError`, `ValidationError` |
 
 ## Package overview
