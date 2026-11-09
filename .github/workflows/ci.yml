@@ -36,3 +36,30 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  # A bare install (no test group) must not pull in the test-only references,
+  # and integrix must import there. SciPy is not checked: JAX depends on it.
+  base-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Install the base distribution only
+        run: |
+          uv venv .venv-base
+          uv pip install --python .venv-base .
+      - name: The test references are absent and integrix imports
+        run: |
+          .venv-base/bin/python - <<'PY'
+          import importlib.util
+
+          references = ("quadax", "hypothesis")
+          present = [name for name in references if importlib.util.find_spec(name)]
+          assert not present, f"the base install pulled in {present}"
+
+          import integrix
+
+          print("integrix", integrix.__version__, "imports without the test group")
+          PY
