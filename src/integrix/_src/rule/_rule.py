@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import functools
-import operator
 from collections.abc import Callable
 from typing import Any
 
@@ -12,6 +11,14 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Bool, Inexact, Int
 
+from integrix._src._axes import (
+    as_inexact,
+    check_node_shape,
+    flatten,
+    nodes_first,
+    normalise_axes,
+    working_dtype,
+)
 from integrix._src.rule._pairwise import pairwise_sum
 from integrix._typing import Axes, RuleLike
 from integrix.exceptions import ValidationError
@@ -133,12 +140,12 @@ def integrate(
         axes = tuple(range(weights.ndim))
     else:
         values = jnp.asarray(values_or_fn)
-        axes = _normalise_axes(axis, values.ndim, weights.ndim)
-    _check_node_shape(values, axes, weights.shape)
+        axes = normalise_axes(axis, values.ndim, weights.ndim)
+    check_node_shape(values, axes, weights.shape)
 
-    dtype = _working_dtype(values.dtype, weights.dtype)
-    samples = _nodes_first(values.astype(dtype), axes)
-    flat_weights = _flatten(weights).astype(dtype)
+    dtype = working_dtype(values.dtype, weights.dtype)
+    samples = nodes_first(values.astype(dtype), axes)
+    flat_weights = flatten(weights).astype(dtype)
     value = _contract(flat_weights, samples)
     return Integral(
         value=value,
@@ -196,22 +203,22 @@ def weighted_mean(
     weights, _ = _read_rule(rule)
     values = jnp.asarray(values)
     weight = jnp.asarray(weight)
-    axes = _normalise_axes(axis, values.ndim, weights.ndim)
-    _check_node_shape(values, axes, weights.shape)
+    axes = normalise_axes(axis, values.ndim, weights.ndim)
+    check_node_shape(values, axes, weights.shape)
 
-    dtype = _working_dtype(values.dtype, weights.dtype, weight.dtype)
-    samples = _nodes_first(values.astype(dtype), axes)
-    flat_weights = _flatten(weights).astype(dtype)
+    dtype = working_dtype(values.dtype, weights.dtype, weight.dtype)
+    samples = nodes_first(values.astype(dtype), axes)
+    flat_weights = flatten(weights).astype(dtype)
     # A weight shaped like the values is read per sample, in the values'
     # layout, even when it also has the weights' shape (a square grid).
     if weight.shape == values.shape:
         # one Rₙ per sample: the same contraction on R ⊙ L and on R
-        response = _nodes_first(weight.astype(dtype), axes)
+        response = nodes_first(weight.astype(dtype), axes)
         numerator = _contract(flat_weights, response * samples)
         denominator = _contract(flat_weights, response)
     elif weight.shape == weights.shape:
         # one Rₙ per node, in the rule's order: wₙ Rₙ
-        flat_response = _flatten(weight).astype(dtype)
+        flat_response = flatten(weight).astype(dtype)
         combined = flat_weights * flat_response
         numerator = _contract(combined, samples)
         denominator = pairwise_sum(combined)
@@ -267,86 +274,7 @@ def _read_rule(rule: Rule) -> tuple[Inexact[Array, ...], Any]:
             f"'rule' must have at least one weight per axis, got weights of "
             f"shape {weights.shape}"
         )
-    if not jnp.issubdtype(weights.dtype, jnp.inexact):
-        weights = weights.astype(jnp.result_type(float))
-    return weights, nodes
-
-
-def _working_dtype(values_dtype: Any, *coefficient_dtypes: Any) -> Any:
-    """The dtype a sum runs in: the values' precision, complex if any input is.
-
-    Floating values keep their dtype (precision is the caller's), so float64
-    weights never promote float32 values. Integer values take the weights'
-    floating dtype. A complex weight promotes real values to the complex type
-    of their own precision rather than losing its imaginary part.
-    """
-    if jnp.issubdtype(values_dtype, jnp.inexact):
-        dtype = values_dtype
-    else:
-        dtype = coefficient_dtypes[0]
-    if any(jnp.issubdtype(other, jnp.complexfloating) for other in coefficient_dtypes):
-        dtype = jnp.promote_types(dtype, jnp.complex64)
-    return dtype
-
-
-def _normalise_axes(axis: Axes | None, ndim: int, n_axes: int) -> tuple[int, ...]:
-    """The integrated axes as non-negative positions, one per weights axis."""
-    if axis is None:
-        axis = tuple(range(-n_axes, 0))
-    try:
-        if isinstance(axis, tuple):
-            axes = tuple(operator.index(position) for position in axis)
-        else:
-            axes = (operator.index(axis),)
-    except TypeError as err:
-        raise ValidationError(
-            f"'axis' must be an integer or a tuple of integers, got {axis!r}"
-        ) from err
-    if len(axes) != n_axes:
-        raise ValidationError(
-            f"'axis' must name one axis per weights axis ({n_axes}), got {axis}"
-        )
-    normalised = []
-    for position in axes:
-        if not -ndim <= position < ndim:
-            raise ValidationError(
-                f"'axis' must be within the values' {ndim} axes, got {position}"
-            )
-        normalised.append(position % ndim)
-    if len(set(normalised)) != len(normalised):
-        raise ValidationError(f"'axis' must not repeat an axis, got {axis}")
-    return tuple(normalised)
-
-
-def _check_node_shape(
-    values: Array, axes: tuple[int, ...], node_shape: tuple[int, ...]
-) -> None:
-    """Raise unless the values have one entry per node along ``axes``."""
-    shape = tuple(values.shape[position] for position in axes)
-    if shape != node_shape:
-        raise ValidationError(
-            f"'values' must have one entry per node along axes {axes}: got shape "
-            f"{shape}, expected {node_shape}"
-        )
-
-
-def _nodes_first(values: Array, axes: tuple[int, ...]) -> Inexact[Array, "node ..."]:
-    """Move ``axes`` first and flatten them into one node axis, (N, …)."""
-    names = [f"d{position}" for position in range(values.ndim)]
-    node_names = " ".join(names[position] for position in axes)
-    rest_names = " ".join(
-        name for position, name in enumerate(names) if position not in axes
-    )
-    samples = einx.id(f"{' '.join(names)} -> ({node_names}) {rest_names}", values)
-    if not jnp.issubdtype(samples.dtype, jnp.inexact):
-        samples = samples.astype(jnp.result_type(float))
-    return samples
-
-
-def _flatten(weights: Array) -> Inexact[Array, " node"]:
-    """Flatten a weights array of any rank into one node axis."""
-    names = " ".join(f"d{position}" for position in range(weights.ndim))
-    return einx.id(f"{names} -> ({names})", weights)
+    return as_inexact(weights), nodes
 
 
 def _contract(

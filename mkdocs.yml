@@ -73,6 +73,7 @@ nav:
   - Overview: index.md
   - Capability index: capabilities.md
   - Rules: rule.md
+  - Scans: scan.md
   - Type aliases: typing.md
   - Exceptions: exceptions.md
 
