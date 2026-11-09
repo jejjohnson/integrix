@@ -1,13 +1,13 @@
 [project]
-name = "mypackage"
-version = "0.1.7"
-description = "My short description for my project."
+name = "integrix"
+version = "0.0.1"
+description = "Integration for JAX: rules, scans and time steppers, with shared adaptivity and adjoints."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-keywords = []
+keywords = ["jax", "quadrature", "integration", "time stepping", "adjoints", "geoscience"]
 requires-python = ">=3.12"
 classifiers = [
     "Topic :: Scientific/Engineering",
@@ -19,25 +19,46 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-dependencies = []
+dependencies = [
+    "jax>=0.10",
+    "jaxlib>=0.10",
+    "equinox>=0.13.8",
+    "jaxtyping>=0.3",
+    "einx>=0.4.3",
+    "lineax>=0.1.1",
+    "optimistix>=0.1.0",
+    # The steppers subclass diffrax's solver protocol, so the minor version is
+    # pinned and moves only with a run of every stepper's tests.
+    "diffrax>=0.7.2,<0.8",
+    # Unpublished siblings resolve from git. functax has no tag yet, so it is
+    # pinned to a commit on main; move it to a tag once functax cuts one.
+    "functax[jax] @ git+https://github.com/jejjohnson/functax@e7eb8f9423666a0f32fcda1aa5ac88611d823fcc",
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.12",
+]
 
 [project.urls]
-Repository = "https://github.com/jejjohnson/mypackage"
-
-[project.scripts]
-mypackage = "mypackage.cli:main"
+Repository = "https://github.com/jejjohnson/integrix"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.7.0",
     "poethepoet>=0.49.0",
     "cyclopts>=5.3.3",
     "loguru>=0.7.3",
 ]
+test = [
+    # SciPy and quadax are the references every rule, scan and stepper is
+    # tested against; neither is a runtime dependency.
+    "scipy>=1.14",
+    "quadax>=0.2",
+    "hypothesis>=6.100",
+    # The runtime checker behind jaxtyping's import hook in tests/conftest.py.
+    "beartype>=0.19",
+]
 lint = [
-    "ruff>=0.15.22",
+    "ruff>=0.17.3",
 ]
 typecheck = [
     "ty>=0.0.83",
@@ -49,9 +70,9 @@ docs = [
     # on 2026-11-05) builds only the API reference from mkdocs.yml; its
     # `objects.inv` is what lets the MyST prose cross-reference into it.
     "zensical>=0.0.74",
-    "mkdocstrings[python]>=1.0.6",
+    "mkdocstrings[python]>=1.0.8",
     "jupytext>=1.19.6",
-    "ipykernel>=7.3.0",
+    "ipykernel>=7.4.0",
     "nbconvert>=7.17.2",
     # matplotlib + watermark used by the example notebooks during local
     # re-execution. The guarded watermark cell in each notebook no-ops
@@ -65,12 +86,19 @@ docs = [
     "pygments>=2.21.0,<2.22",
 ]
 
+[tool.uv]
+default-groups = ["dev", "test"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# functax and gaussx are git references until they are published.
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypackage"]
+packages = ["src/integrix"]
 
 [tool.ruff]
 target-version = "py312"
@@ -100,10 +128,10 @@ docstring-code-line-length = 72
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-# `src/mypackage` is a testpath so that --doctest-modules collects the
+# `src/integrix` is a testpath so that --doctest-modules collects the
 # ``Examples:`` blocks in every Google-style docstring. They are executable
 # documentation: if an example in the docs goes stale, CI fails.
-testpaths = ["tests", "src/mypackage"]
+testpaths = ["tests", "src/integrix"]
 # Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
 strict_markers = true
 markers = [
@@ -112,13 +140,13 @@ markers = [
 ]
 addopts = """\
     --doctest-modules \
-    --cov=src/mypackage \
+    --cov=src/integrix \
     --cov-report=term-missing \
     --cov-report=xml:coverage.xml\
 """
 
 [tool.coverage.run]
-source = ["src/mypackage"]
+source = ["src/integrix"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
@@ -135,7 +163,7 @@ exclude_also = [
 #   uv run poe            # list every task with its help text
 #   uv run poe install    # first run: `uv run` syncs the dev group, so poe exists
 # Extra arguments are passed through to the underlying command, e.g.
-#   uv run poe test tests/test_stats.py -k summarize
+#   uv run poe test tests/test_exceptions.py -k stdlib
 # ---------------------------------------------------------------------------
 [tool.poe]
 # Tasks call `uv run --group …` themselves, exactly as CI does, so poe must not
@@ -146,7 +174,7 @@ envfile = { optional = ".env" }
 
 [tool.poe.env]
 # Overridable from .env or the shell.
-PKGROOT.default = "src/mypackage"
+PKGROOT.default = "src/integrix"
 TYPECHECK_EXTRA.default = "scripts"
 
 # --- Meta -------------------------------------------------------------------

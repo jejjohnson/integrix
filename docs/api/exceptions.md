@@ -1,17 +1,12 @@
 # Exceptions
 
-Every error raised by the package derives from
-[`MypackageError`][mypackage.MypackageError] *and* from the closest
-standard-library exception.
+Every error raised by the package derives from [`IntegrixError`][integrix.IntegrixError] *and* from the closest standard-library exception.
 
 ```mermaid
 graph TD
-    E[Exception] --> M[MypackageError]
+    E[Exception] --> F[IntegrixError]
     V[ValueError] --> VE[ValidationError]
-    M --> VE
-    VE --> ES[EmptySeriesError]
-    R[RuntimeError] --> NF[NotFittedError]
-    M --> NF
+    F --> VE
 ```
 
-::: mypackage.exceptions
+::: integrix.exceptions
