@@ -221,6 +221,24 @@ An issue's id comes from `gh api repos/{owner}/{repo}/issues/<N> --jq .id`. The 
 
 ---
 
+## Testing a procedure
+
+Every rule, scan, stepper and estimator is checked the same way, with the helpers in `tests/_harness.py`. Import them in a test file with `from _harness import assert_order, …` (pytest puts `tests/` on the import path). Each helper raises `AssertionError` with the numbers behind the failure.
+
+| Helper | Checks |
+|---|---|
+| `assert_exact_on_polynomials(integrate_fn, max_degree, *, interval=(0.0, 1.0), rtol=1e-13)` | $\int_a^b x^k \mathrm{d}x$ for $k = 0, \dots, d$, against a scale that bounds $\int_a^b \lvert x \rvert^k \mathrm{d}x$ (gate G0-exact) |
+| `assert_matches_scipy(actual, reference, *, rtol, atol=0.0)` | the values against `scipy.integrate`, quadax or a closed form, naming the worst index (gate G0-scipy at `rtol=1e-14`) |
+| `assert_order(step_errors, expected_order, *, slack=0.1)` | the least-squares slope of $\log e$ against $\log h$ over a sequence of step sizes |
+| `assert_grad_matches_fd(fn, x, *, eps=1e-6, rtol=1e-6)` | `jax.jacrev(fn)` against central differences, relative to the largest Jacobian entry |
+| `assert_within_stderr(estimate, standard_error, exact, *, n_sigma=4.0)` | $\lvert \hat I - I \rvert \le n_\sigma \hat\sigma$, a bound from the estimator's own sampling distribution |
+| `assert_traces(fn, *args, rtol=1e-12)` | `jit(fn)`, `vmap(fn)` and `jit(vmap(fn))` against an eager loop over a leading batch axis |
+| `assert_float32_drift(fn, values64, *, rtol)` | `fn` on float32 input returns float32 and stays within `rtol` of the float64 run |
+
+The reference problems are $y' = \lambda y$ with $y(T) = y_0 e^{\lambda T}$ for steppers, $\int_0^\pi \sin x \mathrm{d}x = 2$, and $\int_0^1 e^x \mathrm{d}x = e - 1$ for the trapezoid's $O(h^2)$ convergence. A test whose reference is itself approximate states its own tolerance with a comment saying where it comes from. The helpers refuse to run without `jax_enable_x64`, which `tests/conftest.py` turns on for the suite.
+
+The reference libraries (SciPy, quadax) are in the `test` dependency group only, never in the runtime dependencies. A sweep that takes over a second is marked `@pytest.mark.slow`; for a parametrised sweep, mark only the expensive cases with `pytest.param(..., marks=pytest.mark.slow)`. CI runs every tier.
+
 ## Pre-commit checklist
 
 Run these locally before opening a PR:
