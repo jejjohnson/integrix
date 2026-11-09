@@ -1,9 +1,8 @@
-"""finitevolX's tests for the pure explicit step functions, run against integrix.
+"""finitevolX's tests for the pure step functions, run against integrix.
 
 Ported from finitevolX ``tests/test_timestepping.py`` at ``82090a3`` for gate
-G1-port (#19): every test body is unchanged; only the import path moves from
-``finitevolx`` to ``integrix.march``. The AB2 and leapfrog tests arrive with
-#20.
+G1-port (#19, #20): every test body is unchanged; only the import path moves
+from ``finitevolx`` to ``integrix.march``.
 """
 
 from __future__ import annotations
@@ -16,9 +15,11 @@ import numpy as np
 import pytest
 
 from integrix.march import (
+    ab2_step,
     ab3_step,
     euler_step,
     heun_step,
+    leapfrog_raf_step,
     rk3_ssp_step,
     rk4_step,
 )
@@ -257,6 +258,48 @@ class TestPureFunctionalVsDiffrax:
         np.testing.assert_allclose(float(y_pure), y_dfx, atol=1e-14)
 
 
+class TestAB2:
+    def test_convergence(self):
+        y0 = jnp.array(1.0)
+        dt = 0.01
+        t_final = 1.0
+        n_steps = int(round(t_final / dt))
+
+        # Bootstrap with one Euler step
+        rhs_0 = _exponential_decay(y0)
+        y1 = euler_step(y0, _exponential_decay, dt)
+        rhs_nm1 = rhs_0
+
+        y = y1
+        for _ in range(n_steps - 1):
+            y, rhs_n, rhs_nm1 = ab2_step(y, _exponential_decay, dt, rhs_nm1)
+            rhs_nm1 = rhs_n
+
+        exact = float(jnp.exp(-t_final))
+        np.testing.assert_allclose(float(y), exact, rtol=5e-3)
+
+    def test_convergence_rate(self):
+        """AB2 should converge at order ~2."""
+        y0 = jnp.array(1.0)
+        t_final = 1.0
+        exact = float(jnp.exp(-t_final))
+        errors = []
+
+        for dt in [0.05, 0.025, 0.0125]:
+            n_steps = int(round(t_final / dt))
+            rhs_0 = _exponential_decay(y0)
+            y1 = euler_step(y0, _exponential_decay, dt)
+            rhs_nm1 = rhs_0
+            y = y1
+            for _ in range(n_steps - 1):
+                y, rhs_n, rhs_nm1 = ab2_step(y, _exponential_decay, dt, rhs_nm1)
+                rhs_nm1 = rhs_n
+            errors.append(abs(float(y) - exact))
+
+        rate = np.log2(errors[-2] / errors[-1])
+        assert rate > 1.8, f"AB2 expected order ~2, got {rate:.2f}"
+
+
 class TestAB3:
     def test_convergence(self):
         y0 = jnp.array(1.0)
@@ -314,6 +357,49 @@ class TestAB3:
         assert rate > 2.5, f"AB3 expected order ~3, got {rate:.2f}"
 
 
+class TestLeapfrogRAF:
+    def test_convergence(self):
+        y0 = jnp.array(1.0)
+        dt = 0.01
+        t_final = 1.0
+        n_steps = int(round(t_final / dt))
+
+        # Bootstrap: first step with Euler
+        y1 = euler_step(y0, _exponential_decay, dt)
+        y_nm1 = y0
+
+        y_curr = y1
+        for _ in range(n_steps - 1):
+            y_next, y_curr_filtered = leapfrog_raf_step(
+                y_curr, y_nm1, _exponential_decay, dt, alpha=0.05
+            )
+            y_nm1 = y_curr_filtered
+            y_curr = y_next
+
+        exact = float(jnp.exp(-t_final))
+        np.testing.assert_allclose(float(y_curr), exact, rtol=5e-2)
+
+    @pytest.mark.parametrize("alpha", [0.01, 0.05, 0.1])
+    def test_alpha_all_stable(self, alpha):
+        """Different RAF alphas should all produce finite, reasonable results."""
+        y0 = jnp.array(1.0)
+        dt = 0.01
+        n_steps = 100
+        y1 = euler_step(y0, _exponential_decay, dt)
+        y_nm1 = y0
+        y_curr = y1
+        for _ in range(n_steps - 1):
+            y_next, y_curr_filtered = leapfrog_raf_step(
+                y_curr, y_nm1, _exponential_decay, dt, alpha=alpha
+            )
+            y_nm1 = y_curr_filtered
+            y_curr = y_next
+        assert jnp.isfinite(y_curr)
+        # Should be within a factor of 2 of exp(-1)
+        exact = float(jnp.exp(-1.0))
+        assert abs(float(y_curr) - exact) < 0.1
+
+
 def _rates(errors):
     return [float(np.log2(a / b)) for a, b in itertools.pairwise(errors)]
 
@@ -353,3 +439,26 @@ class TestMultistepStartupAndFilterOrders:
     def test_ab3_rk3_bootstrap_is_third_order(self):
         rates = _rates([self._ab3_error(dt, "rk3") for dt in (0.05, 0.025, 0.0125)])
         assert all(r > 2.8 for r in rates), rates
+
+    @staticmethod
+    def _leapfrog_error(dt, alpha):
+        n = int(round(1.0 / dt))
+        y0 = jnp.array(1.0)
+        y1 = rk3_ssp_step(y0, _decay15, dt)
+
+        def body(carry, _):
+            y_nm1, y = carry
+            y_next, y_filt = leapfrog_raf_step(y, y_nm1, _decay15, dt, alpha=alpha)
+            return (y_filt, y_next), None
+
+        (_, y), _ = jax.lax.scan(body, (y0, y1), None, length=n - 1)
+        return abs(float(y) - float(np.exp(-1.5)))
+
+    def test_leapfrog_order_two_without_filter(self):
+        rates = _rates([self._leapfrog_error(dt, 0.0) for dt in (0.02, 0.01, 0.005)])
+        assert all(r > 1.9 for r in rates), rates
+
+    def test_leapfrog_raf_is_first_order(self):
+        """alpha = 0.05 (the default): the filter's O(alpha dt) error dominates."""
+        rates = _rates([self._leapfrog_error(dt, 0.05) for dt in (0.02, 0.01, 0.005)])
+        assert all(0.9 < r < 1.4 for r in rates), rates
