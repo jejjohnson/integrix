@@ -89,16 +89,16 @@ The Butcher weights $b_i$ are a rule's weights on $[0, 1]$ and have nothing to d
 | $w^{(e)}$, $N_\text{eff}$ | | importance weights, and the effective sample size | `Expectation.effective_sample_size` |
 :::
 
-## Precision and the methane example
+## Precision, space and the methane example
 
-:::{table} Symbols of chapters 11 and 13.
+:::{table} Symbols of chapters 11 to 13.
 :label: tbl-notation-applied
 
 | Symbol | Shape | Meaning | In code |
 | --- | --- | --- | --- |
 | $\varepsilon$ | | the unit round-off of a dtype ($2^{-24}$ in float32) | `jnp.finfo(dtype).eps / 2` |
 | $\kappa$ | | the condition number of a sum, $\sum_n \vert w_n f_n \vert / \vert \sum_n w_n f_n \vert$ | |
-| $\Omega(x, y)$, $\Omega_\text{bg}$ | kg m⁻² | the methane column mass and its background, as in the IME literature (chapter 13 only; elsewhere $\Omega$ is the domain) | |
+| $\Omega(x, y)$, $\Omega_\text{bg}$ | kg m⁻² | the methane column mass and its background, as in the IME literature (chapters 12 and 13 only; elsewhere $\Omega$ is the domain) | |
 | $\delta$ | | a column enhancement relative to the background | |
 | $Q$, $U$, $L_P$ | kg s⁻¹, m s⁻¹, m | the emission rate, the wind speed and the plume length along the wind | |
 :::

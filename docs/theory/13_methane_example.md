@@ -20,7 +20,7 @@ This chapter follows one synthetic satellite scene of a methane plume from the s
 | the sensitivity to the wind | the adjoint of the march | `Checkpointed` | 9 |
 | the uncertainty of $Q$ | an expectation over wind and noise | `expect.monte_carlo` | 10 |
 
-Everything here is a toy: a three-line spectrum, an exponential atmosphere, a 40 by 24 grid of 50 m pixels and a constant wind, so that the whole page runs in under half a minute. The numbers are not those of any real instrument, but every step is the one a real retrieval takes. The area and line integrals use plain weights arrays today; the spatial integrals of chapter 12 (#47) will add masks and transects to the rules themselves.
+Everything here is a toy: a three-line spectrum, an exponential atmosphere, a 40 by 24 grid of 50 m pixels and a constant wind, so that the whole page runs in under half a minute. The numbers are not those of any real instrument, but every step is the one a real retrieval takes. The area and line integrals use plain weights arrays and masks; chapter 12 has the theory behind them.
 
 ## From spectrum to column
 
@@ -227,7 +227,7 @@ The second estimate is a mass balance across the plume. In a steady state every 
 # today (integrix)
 # IME = ∑ over P of Ω̂ᵢⱼ Δx²
 in_plume = retrieved > 3.0 * column_noise  # → (N_y, N_x)
-ime = rule.integrate(pixel_area * in_plume, retrieved, axis=(0, 1)).value
+ime = rule.integrate(pixel_area, retrieved, axis=(0, 1), where=in_plume).value
 plume_columns = jnp.nonzero(einx.any("y x -> x", in_plume))[0]
 plume_length = (float(plume_columns.max()) - 4 + 0.5) * spacing
 ime_rate = float(ime) * wind / plume_length * 3600.0
