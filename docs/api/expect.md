@@ -8,4 +8,6 @@ The theory is in the [Expectations](../expectations/) chapter of the mathematica
 
 For integrands that underflow, two conveniences return log-integrals through `integrix.rule.log_integrate`. `log_gauss_hermite` computes $\log \mathbb{E}[f(Q)]$ for a lognormal $Q$ by Gauss–Hermite quadrature in $\log Q$, and `log_simpson` computes $\log \int_a^b f(q) \mathrm{d}q$ by Simpson's rule on a uniform grid in $\log q$, which resolves a lognormal body and a power-law tail alike.
 
+Two diagnostics check importance weights. `effective_sample_size` is $(\sum_s w_s)^2 / \sum_s w_s^2$, computed from $\log w_s$ so no weight is exponentiated. `pareto_smoothed_log_weights` replaces the largest weights by the quantiles of a generalised Pareto distribution fitted to their tail (Vehtari et al.'s Pareto-smoothed importance sampling) and returns the tail shape $\hat{k}$, where $\hat{k} > 0.7$ means the importance estimate should not be trusted. Both are written in JAX and batch over leading axes, and `importance(..., diagnostics=True)` reports $\hat{k}$ as `pareto_k`.
+
 ::: integrix.expect
