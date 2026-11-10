@@ -36,6 +36,21 @@ project:
     - title: Guide
       children:
         - file: guide/quickstart.md
+    - title: Mathematical reference
+      children:
+        - title: Foundation
+          children:
+            - file: theory/01_integral.md
+            - file: theory/02_weighted_summation.md
+            - file: theory/03_global_and_local.md
+            - file: theory/04_bases_and_stencils.md
+        - title: Reference
+          children:
+            - file: theory/notation.md
+            - file: theory/references.md
+    - title: Examples
+      children:
+        - file: notebooks/theory_convergence.ipynb
     - title: Project
       children:
         - file: contributing.md

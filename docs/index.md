@@ -32,4 +32,5 @@ uv run poe install
 ## Next steps
 
 - [Quickstart](guide/quickstart.md): the three operations and where each lives
+- [Mathematical reference](theory/01_integral.md): the theory behind the weights, from the integral to global and local rules, bases and stencils
 - [API reference](https://jejjohnson.github.io/integrix/reference/): every module and the capability index
