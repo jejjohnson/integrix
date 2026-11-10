@@ -26,7 +26,8 @@
 10. Takahasi, H., & Mori, M. (1974). Double exponential formulas for numerical integration. *Publications of the Research Institute for Mathematical Sciences* 9, 721–741. The tanh–sinh substitution (chapter 8).
 11. Griewank, A., & Walther, A. (2008). *Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation* (2nd ed.). SIAM. Reverse mode and checkpointing (chapter 9).
 12. Owen, A. B. (2013). *Monte Carlo Theory, Methods and Examples*. Monte Carlo, quasi-Monte Carlo, the Koksma–Hlawka inequality and importance sampling (chapter 10).
+13. Vehtari, A., Simpson, D., Gelman, A., Yao, Y., & Gabry, J. Pareto smoothed importance sampling. arXiv:1507.02646. Pareto-smoothed weights and the tail diagnostic k̂ (chapter 10).
 
 ## Methane plumes
 
-13. Varon, D. J., et al. (2018). Quantifying methane point sources from fine-scale satellite observations of atmospheric methane plumes. *Atmospheric Measurement Techniques* 11, 5673–5686. The integrated mass enhancement and cross-sectional flux methods (chapter 13).
+14. Varon, D. J., et al. (2018). Quantifying methane point sources from fine-scale satellite observations of atmospheric methane plumes. *Atmospheric Measurement Techniques* 11, 5673–5686. The integrated mass enhancement and cross-sectional flux methods (chapter 13).

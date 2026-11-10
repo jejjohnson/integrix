@@ -87,6 +87,9 @@ The Butcher weights $b_i$ are a rule's weights on $[0, 1]$ and have nothing to d
 | $\vect{x}^{(e)}$, $N_\mathcal{E}$ | $\mathbb{R}^{D}$ | a draw, and the number of draws | `n` |
 | $\hat{\sigma}$ | | the standard error of an estimate | `Expectation.standard_error` |
 | $w^{(e)}$, $N_\text{eff}$ | | importance weights, and the effective sample size | `Expectation.effective_sample_size` |
+| $\hat{k}$, $M$ | | the fitted Pareto tail shape of the importance weights, and the number of weights in the fitted tail | `pareto_smoothed_log_weights`, `Expectation.pareto_k` |
+| $\Lambda(t_0, t_0 + s)$, $\Delta t$ | | the integrated event rate over a window, and the wait for the next event | |
+| $q$, $P_d(q)$, $\bar{P}$ | kg h⁻¹ | an emission rate, the detection probability, and the detected fraction (chapter 10) | |
 :::
 
 ## Precision, space and the methane example
