@@ -4,4 +4,6 @@ An expectation is an integral over a probability space, $\mathbb{E}[f] = \int f(
 
 integrix averages; sampling from a posterior stays in NumPyro and pyrox.
 
+The theory is in the [Expectations](../expectations/) chapter of the mathematical reference.
+
 ::: integrix.expect

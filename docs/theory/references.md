@@ -19,3 +19,10 @@
 
 7. Hairer, E., Nørsett, S. P., & Wanner, G. (1993). *Solving Ordinary Differential Equations I: Nonstiff Problems* (2nd ed.). Springer. Runge–Kutta order conditions, Adams methods, local and global error (chapter 7).
 8. Ketcheson, D. I. (2008). Highly efficient strong stability-preserving Runge–Kutta methods with low-storage implementations. *SIAM Journal on Scientific Computing* 30(4), 2113–2136. The ten-stage, fourth-order SSP method (chapter 7).
+
+## Adaptivity, adjoints and expectations
+
+9. Piessens, R., de Doncker-Kapenga, E., Überhuber, C. W., & Kahaner, D. K. (1983). *QUADPACK: A Subroutine Package for Automatic Integration*. Springer. Gauss–Kronrod pairs and global adaptive bisection (chapter 8).
+10. Takahasi, H., & Mori, M. (1974). Double exponential formulas for numerical integration. *Publications of the Research Institute for Mathematical Sciences* 9, 721–741. The tanh–sinh substitution (chapter 8).
+11. Griewank, A., & Walther, A. (2008). *Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation* (2nd ed.). SIAM. Reverse mode and checkpointing (chapter 9).
+12. Owen, A. B. (2013). *Monte Carlo Theory, Methods and Examples*. Monte Carlo, quasi-Monte Carlo, the Koksma–Hlawka inequality and importance sampling (chapter 10).

@@ -6,4 +6,6 @@ Adaptive quadrature computes $I = \int_a^b f(x) \mathrm{d}x$ to a tolerance, wit
 
 The Gauss–Kronrod nodes and weights are QUADPACK's (Piessens et al., 1983). The design follows quadax, with no dependency on it; quadax and `scipy.integrate.quad` are test references only.
 
+The theory is in the [Adaptivity](../adaptivity/) chapter of the mathematical reference.
+
 ::: integrix.adapt

@@ -71,6 +71,24 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 
 The Butcher weights $b_i$ are a rule's weights on $[0, 1]$ and have nothing to do with the moments $b_m$ of chapter 2; the two never meet on one page.
 
+## Adaptivity, adjoints and expectations
+
+:::{table} Error estimates, adjoints and random nodes, from chapters 8 to 10.
+:label: tbl-notation-cross
+
+| Symbol | Shape | Meaning | In code |
+| --- | --- | --- | --- |
+| $G_n$, $K_{2n+1}$, $E$ | | a Gauss rule, its Kronrod extension, and the error estimate of the pair | `GaussKronrod`, `Integral.error` |
+| $\vect{x}^\dagger_k$ | $\mathbb{R}^{D_x}$ | the adjoint state at step $k$ | |
+| $\mat{J}_{\Phi,k}$ | $D_x \times D_x$ | the Jacobian of one step map $\Phi$ at $\vect{x}_k$ | |
+| $\mathcal{J}$ | $\mathbb{R}$ | a cost over the state, such as a 4D-Var misfit | |
+| $B$ | | the block length of checkpointing, the spacing of the stored states | `every` |
+| $D$ | | the dimension of an expectation's integration space | `dim` |
+| $\vect{x}^{(e)}$, $N_\mathcal{E}$ | $\mathbb{R}^{D}$ | a draw, and the number of draws | `n` |
+| $\hat{\sigma}$ | | the standard error of an estimate | `Expectation.standard_error` |
+| $w^{(e)}$, $N_\text{eff}$ | | importance weights, and the effective sample size | `Expectation.effective_sample_size` |
+:::
+
 ## Physical symbols
 
 Each page declares the physical symbols it uses in its own table. The ones that recur are wavelength $\lambda$ (nm), pressure $p$ and surface pressure $p_\text{s}$ (hPa), latitude $\phi$ with $\mu = \sin \phi$, longitude $\vartheta$, and height $z$ (m).
