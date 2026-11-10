@@ -36,6 +36,7 @@ project:
     - title: Guide
       children:
         - file: guide/quickstart.md
+        - file: guide/spatial_integrals.md
     - title: Mathematical reference
       children:
         - title: Foundation
