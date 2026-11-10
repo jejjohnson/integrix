@@ -172,7 +172,7 @@ current).
 
 <!-- upstream -->
 
-Listed at jax 0.12.0.1, equinox 0.13.8, diffrax 0.7.2, lineax 0.1.1, optimistix 0.1.0, einx 0.4.3, functax 0.0.1, gaussx 0.6.12.
+Listed at jax 0.12.0.1, equinox 0.13.8, diffrax 0.7.2, lineax 0.1.1, optimistix 0.1.0, einx 0.4.3, functax 0.0.6, gaussx 0.6.12.
 
 ## Upstream: `jax`
 
@@ -682,7 +682,28 @@ quadrature rules (nodes and weights) that integrix sums with
 | `FunctaxError` | class | Base class for every exception raised by ``functax``. |
 | `GeometryError` | class | Raised when an axis, grid or point set is malformed. |
 | `MissingExtraError` | class | Raised when a module needs the ``functax[jax]`` extra and it is missing. |
+| `NonlinearSchemeError` | class | Raised when a linear-only operation meets a plan whose fit is nonlinear in y. |
+| `OutsideDomainError` | class | Raised under ``outside="raise"`` when a target lies outside the domain. |
+| `PolicyError` | class | Raised when an interpolation policy names an option that does not exist. |
 | `ValidationError` | class | Raised when an argument fails validation. |
+
+### `functax.quad`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `CurveRule` | class | A rule on a curve L: ∫_L c dℓ ≈ ∑ₖ Δsₖ c(xₖ), with the unit normal nₖ. |
+| `Rule` | class | A quadrature rule as data: nodes xₙ and weights wₙ, ∫ g dx ≈ ∑ₙ wₙ g(xₙ). |
+| `SphereRule` | class | A rule on a sphere of radius a: ∫_{S²} g dA ≈ ∑_q w_q g(u_q). |
+| `cell_area` | function | The cell-area rule of a grid: ∫ g dA ≈ ∑ₖ \|Cₖ\| g(xₖ) over its cells Cₖ. |
+| `clenshaw_curtis` | function | The n-point Clenshaw–Curtis rule on [a, b], at the Chebyshev extreme points. |
+| `gauss_legendre` | function | The n-point Gauss–Legendre rule on an interval [a, b]. |
+| `polyline` | function | A rule along a polyline: n nodes per segment, arc-length weights and normals. |
+| `simpson` | function | The composite Simpson rule on given nodes, as ``scipy.integrate.simpson``. |
+| `sphere_fibonacci` | function | The Fibonacci rule: n near-uniform points of equal weight 4πa²/n. |
+| `sphere_gauss_legendre` | function | The Gauss–Legendre × uniform-longitude rule on the sphere, exact to a degree. |
+| `sphere_healpix` | function | The HEALPix rule: 12 N_side² pixel centres of equal weight 4πa²/Q. |
+| `sphere_latlon` | function | The cell-centred lon/lat rule: equiangular cells weighted by their exact areas. |
+| `trapezoid` | function | The composite trapezoid rule on given nodes, uniform or not. |
 
 ## Upstream: `gaussx`
 

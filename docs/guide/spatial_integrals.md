@@ -16,9 +16,9 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import einx
-import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import rule
 from jaxtyping import Array, Float
 
@@ -184,63 +184,17 @@ The sampled form integrates along the line itself: nodes $\vect{s}_k$ on a trans
 
 $$\Phi = \int_L \Omega (\vect{u} \cdot \vect{n}) \mathrm{d}\ell \approx \sum_{k=1}^{K} \Delta s_k \Omega(\vect{s}_k) (\vect{u}_k \cdot \vect{n}_k)$$ (eq-sampled-flux)
 
-with $\vect{u}$ the wind. The rule on the curve (nodes, weights and normals) belongs to functax (functax#81), the field at the nodes comes from functax's interpolation, and integrix only contracts: it adds no line primitive. Until functax#81 lands we build the transect rule by hand, and we sample the plume analytically at the nodes instead of interpolating the image.
+with $\vect{u}$ the wind. The rule on the curve (nodes, weights and normals) belongs to functax, as `functax.quad.polyline`, the field at the nodes comes from functax's interpolation, and integrix only contracts: it adds no line primitive. Here we sample the plume analytically at the nodes instead of interpolating the image.
 
 ```python
 # Shapes: K transect nodes (5, 9, 17 or 33); 2 coordinates (x, y)
-
-
-# user
-class Transect(eqx.Module):
-    """A rule on a straight segment: a stand-in for functax#81's curve rules."""
-
-    # points along the segment
-    nodes: Float[Array, "node 2"]
-    # arc-length weights Δs
-    weights: Float[Array, "node"]
-    # unit normals
-    normals: Float[Array, "node 2"]
-
-
-# user
-def straight_transect(
-    start: Float[Array, "2"], end: Float[Array, "2"], n_nodes: int
-) -> Transect:
-    """Trapezoid weights in arc length and the normal to the left of the direction."""
-    # tₖ = k / (K − 1)
-    fraction = jnp.linspace(0.0, 1.0, n_nodes)                        # → (K,)
-    # d = end − start
-    direction = end - start                                           # → (2,)
-    # oₖ = tₖ d
-    offsets = einx.multiply("k, d -> k d", fraction, direction)       # → (K, 2)
-    # sₖ = start + tₖ d
-    nodes = start + offsets                                           # → (K, 2)
-    # dᵢ²
-    squares = direction**2                                            # → (2,)
-    # d₁² + d₂²
-    total = jnp.sum(squares)                                          # → ()
-    # ℓ = ‖d‖
-    length = jnp.sqrt(total)                                          # → ()
-    # Δs = ℓ / (K − 1)
-    spacing = length / (n_nodes - 1)                                  # → ()
-    # the first and last node
-    ends = jnp.array([0, -1])                                         # → (2,)
-    # Δsₖ = Δs, with Δs / 2 at the two ends
-    weights = jnp.full(n_nodes, spacing).at[ends].set(spacing / 2)    # → (K,)
-    # d⊥ = (−d₂, d₁)
-    perpendicular = jnp.array([-direction[1], direction[0]])          # → (2,)
-    # n = d⊥ / ℓ
-    normal = perpendicular / length                                   # → (2,)
-    # nₖ = n
-    normals = einx.id("d -> k d", normal, k=n_nodes)                  # → (K, 2)
-    return Transect(nodes, weights, normals)
-
-
 for n_nodes in (5, 9, 17, 33):
-    # from (1 km, 1 km) to (1 km, −1 km): the normal points downwind, +x
-    start, end = jnp.array([1000.0, 1000.0]), jnp.array([1000.0, -1000.0])
-    # (s, Δs, n) on the segment
-    line = straight_transect(start, end, n_nodes)
+    # from (1 km, 1 km) to (1 km, −1 km): the normal, to the left of the
+    # direction of travel, points downwind, +x
+    vertices = jnp.array([[1000.0, 1000.0], [1000.0, -1000.0]])        # → (2, 2)
+    # today (functax)
+    # (sₖ, Δsₖ, nₖ): K midpoint nodes on the segment
+    line = quad.polyline(vertices, n_nodes)                           # → (K,)
     # xₖ and yₖ of the nodes
     node_x = line.nodes[:, 0]                                         # → (K,)
     node_y = line.nodes[:, 1]                                         # → (K,)
@@ -257,13 +211,13 @@ for n_nodes in (5, 9, 17, 33):
 ```
 
 ```text
-K =  5: Q = 0.8314120967 kg/s
-K =  9: Q = 0.5105892862 kg/s
-K = 17: Q = 0.5000000126 kg/s
+K =  5: Q = 0.6700447310 kg/s
+K =  9: Q = 0.5031638892 kg/s
+K = 17: Q = 0.5000000012 kg/s
 K = 33: Q = 0.5000000000 kg/s
 ```
 
-Five nodes 500 m apart cannot see a plume 240 m wide, but from there the sampled form converges very fast: the error falls from 2 % at 9 nodes to $10^{-8}$ at 17 and below the printed digits at 33. The plume decays to zero long before the ends of the transect, so the trapezoid rule along it behaves like the periodic trapezoid rule of the theory's [Global and local](../theory/03_global_and_local.md) chapter.
+Five midpoint nodes 400 m apart cannot see a plume 240 m wide, but from there the sampled form converges very fast: the error falls from 0.6 % at 9 nodes to about $10^{-9}$ at 17 and below the printed digits at 33. The plume decays to zero long before the ends of the transect, so the midpoint rule along it behaves like the periodic trapezoid rule of the theory's [Global and local](../theory/03_global_and_local.md) chapter.
 
 ## A column that propagates NaNs
 

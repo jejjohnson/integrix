@@ -386,7 +386,7 @@ for upper in (1e4, 1e5):
 ```text
 reference P = 0.3845823341
 Gauss-Hermite (32), log q:  error 9.2e-07
-Simpson (2001), log q:      error 7.7e-15
+Simpson (2001), log q:      error 6.3e-15
 trapezoid (2001), q to 1e+04: error 1.1e-03
 trapezoid (2001), q to 1e+05: error 6.8e-03
 ```

@@ -38,44 +38,22 @@ jax.config.update("jax_enable_x64", True)
 from typing import Any
 
 import einx
-import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import adjoint, expect, march, rule, scan
 from jaxtyping import Array, Float, PRNGKeyArray
 
-# Shapes: N rule nodes; N_λ = 401 wavelengths; N_z = 61 levels; 3 lines
+# Shapes: N_λ = 401 wavelengths; N_z = 61 levels; 3 lines
 
-
-# user
-class Rule(eqx.Module):
-    """Nodes and weights: a stand-in for functax's rules (functax#44)."""
-
-    nodes: Float[Array, "node"]
-    weights: Float[Array, "node"]
-
-
-# user
-def trapezoid(nodes: Float[Array, "node"]) -> Rule:
-    """The trapezoid rule on given nodes."""
-    # hₙ = sₙ₊₁ − sₙ
-    widths = jnp.diff(nodes)                                      # → (N - 1,)
-    # zero pads the two ends
-    zero = jnp.zeros(1)                                           # → (1,)
-    # hₙ on the left end of each interval, 0 at the last node
-    right = jnp.concatenate([widths, zero])                       # → (N,)
-    # hₙ₋₁ on the right end of each interval, 0 at the first node
-    left = jnp.concatenate([zero, widths])                        # → (N,)
-    # wₙ = (hₙ + hₙ₋₁) / 2
-    weights = 0.5 * (right + left)                                # → (N,)
-    return Rule(nodes, weights)
 
 
 # --- spectrum ---
 # λₖ = 2280 + 0.1 k nm
 wavelength = jnp.linspace(2280.0, 2320.0, 401)                    # → (N_λ,)
+# today (functax)
 # (λ, w) = the trapezoid rule on λ
-spectral_rule = trapezoid(wavelength)
+spectral_rule = quad.trapezoid(wavelength)
 # methane line centres λₗ in nm
 line_centres = jnp.array([2295.0, 2300.0, 2306.0])                # → (3,)
 # relative line strengths Sₗ
@@ -104,7 +82,8 @@ height = jnp.linspace(0.0, 60.0, 61)                              # → (N_z,)
 # n(z) = exp(−z / 8 km), relative
 density = jnp.exp(-height / 8.0)                                  # → (N_z,)
 # (z, w) = the trapezoid rule on z
-rule_z = trapezoid(height)
+# today (functax)
+rule_z = quad.trapezoid(height)
 # today (integrix)
 # N(z) = ∫_z^top n(z′) dz′, from the top down
 column_above = scan.cumulative(rule_z, density, reverse=True)     # → (N_z,)
