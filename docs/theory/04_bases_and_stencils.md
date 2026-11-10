@@ -36,26 +36,22 @@ jax.config.update("jax_enable_x64", True)
 import einx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import rule
 
 # Shapes: K = 4 tiles; N_G = 8 Gauss nodes per tile; N = 32 nodes; D_z = 5 hats
 
 # knots sₖ = k, the tile edges and the hat centres
 knots = jnp.arange(5.0)                                      # → (D_z,)
-# 8 Gauss–Legendre nodes ξ_g and weights on the reference tile [−1, 1]
-reference_nodes, reference_weights = np.polynomial.legendre.leggauss(8)
-# ξ_g + 1
-shifted = reference_nodes + 1.0                              # (N_G,) → (N_G,)
-# t_g = (ξ_g + 1)/2, the same nodes on a tile [k, k + 1] shifted to [0, 1]
-tile_nodes = 0.5 * shifted                                   # (N_G,) → (N_G,)
+# today (functax)
+# 8 Gauss–Legendre nodes t_g and weights w_g on the unit tile [0, 1]
+tile_nodes, tile_weights = quad.gauss_legendre(8, interval=(0.0, 1.0))
 # sₖ,g = sₖ + t_g
 nodes = einx.add(                                            # → (N,)
     "tile, gauss -> (tile gauss)", knots[:-1], tile_nodes
 )
-# w_g = w_ref,g / 2, the same on every tile
-half_weights = 0.5 * reference_weights                       # (N_G,) → (N_G,)
-# wₖ,g = w_g
-weights = jnp.tile(half_weights, 4)                          # (N_G,) → (N,)
+# wₖ,g = w_g, the same on every tile
+weights = jnp.tile(tile_weights, 4)                          # (N_G,) → (N,)
 # dₙ,d = sₙ − s_d
 distance = einx.subtract(                                    # → (N, D_z)
     "node, basis -> node basis", nodes, knots
@@ -126,4 +122,4 @@ This is the same identity that chapter 9 uses for gradients: the gradient of an 
 
 ## Who owns what
 
-Bases, stencils and rules are data, and the procedures that use them are code, so the stack splits them. functax owns the bases (`functax.basis`), the read-outs (`Stencil`, and `Plan` to build them) and the rules (`functax.quad`, functax#44). integrix owns what is done with them: the sums of [](#eq-rule) and [](#eq-basis-integral), the scans, the adaptive refinement, the marches and their adjoints. gaussx owns the Gaussian expectations that come with a closed rule (Gauss–Hermite, unscented). Today integrix's pin of functax has `Stencil` but not yet `Plan` or the rules, so the pages in this section build their Gauss nodes with NumPy; integrix accepts any object with `nodes` and `weights`, or a plain weights array, so the code does not change when the rules land.
+Bases, stencils and rules are data, and the procedures that use them are code, so the stack splits them. functax owns the bases (`functax.basis`), the read-outs (`Stencil`, and `Plan` to build them) and the rules (`functax.quad`). integrix owns what is done with them: the sums of [](#eq-rule) and [](#eq-basis-integral), the scans, the adaptive refinement, the marches and their adjoints. gaussx owns the Gaussian expectations that come with a closed rule (Gauss–Hermite, unscented). The pages in this section take their rules from `functax.quad` (`gauss_legendre`, `trapezoid`, and `polyline` for curves); integrix accepts any object with `nodes` and `weights`, or a plain weights array, so a rule built by hand, such as the exact cell areas of chapter 5, works just as well.

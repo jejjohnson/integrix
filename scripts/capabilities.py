@@ -65,8 +65,8 @@ PACKAGE = _package_name()
 # Libraries the package builds on, as {distribution: [public modules]}, with a
 # one-paragraph blurb each, e.g. {"numpy": ["numpy"]}.
 # The libraries integrix builds on. Only their top-level namespaces are
-# indexed (jax.numpy and jax.lax are too large to list); functax's rules join
-# as `functax.quad` once functax#44 lands.
+# indexed (jax.numpy and jax.lax are too large to list), plus functax's rules
+# in `functax.quad`, which integrix sums with.
 UPSTREAM: dict[str, list[str]] = {
     "jax": ["jax"],
     "equinox": ["equinox"],
@@ -74,7 +74,7 @@ UPSTREAM: dict[str, list[str]] = {
     "lineax": ["lineax"],
     "optimistix": ["optimistix"],
     "einx": ["einx"],
-    "functax": ["functax"],
+    "functax": ["functax", "functax.quad"],
     "gaussx": ["gaussx"],
 }
 UPSTREAM_BLURB: dict[str, str] = {

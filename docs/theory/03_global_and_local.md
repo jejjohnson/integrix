@@ -53,6 +53,7 @@ jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import rule
 from jaxtyping import Array, Float
 from scipy.special import i0
@@ -90,7 +91,7 @@ Each doubling of $N$ roughly squares the error until it hits the round-off of fl
 
 ## A smooth band and an ice edge
 
-Now the two families side by side, on two zonal-mean fields in $\mu = \sin \phi \in [-1, 1]$, where the area of the sphere is uniform in $\mu$. The first is a smooth band of tropical moisture, $f_\text{band}(\mu) = e^{-\mu^2 / (2 \cdot 0.3^2)}$, with an exact integral from the error function. The second is a sea-ice fraction that is zero equatorward of $|\mu| = 0.8$ (about 53°) and grows linearly toward each pole, $f_\text{ice}(\mu) = \max(0, |\mu| - 0.8)$, whose integral is exactly $0.04$. It is continuous but has a kink at each ice edge. The global rule is Gauss–Legendre, from NumPy's nodes and weights; the local rule is the composite trapezoid rule on equally spaced $\mu$. In the table, GL is Gauss–Legendre and TR the trapezoid rule.
+Now the two families side by side, on two zonal-mean fields in $\mu = \sin \phi \in [-1, 1]$, where the area of the sphere is uniform in $\mu$. The first is a smooth band of tropical moisture, $f_\text{band}(\mu) = e^{-\mu^2 / (2 \cdot 0.3^2)}$, with an exact integral from the error function. The second is a sea-ice fraction that is zero equatorward of $|\mu| = 0.8$ (about 53°) and grows linearly toward each pole, $f_\text{ice}(\mu) = \max(0, |\mu| - 0.8)$, whose integral is exactly $0.04$. It is continuous but has a kink at each ice edge. The global rule is Gauss–Legendre and the local rule the composite trapezoid rule on equally spaced $\mu$, both from `functax.quad`. In the table, GL is Gauss–Legendre and TR the trapezoid rule.
 
 ```python
 from scipy.special import erf
@@ -123,15 +124,10 @@ def trapezoid(
     """Equally spaced nodes on [−1, 1], with h/2 at each end."""
     # μₙ = −1 + 2(n − 1)/(N − 1)
     nodes = jnp.linspace(-1.0, 1.0, n_nodes)                                # → (N,)
-    # h = μ₂ − μ₁
-    spacing = nodes[1] - nodes[0]                                           # → ()
-    # the two end nodes, which have half a tile
-    ends = jnp.array([0, -1])                                               # → (2,)
-    # wₙ = h
-    interior = jnp.full(n_nodes, spacing)                                   # → (N,)
-    # wₙ = h/2 at both ends
-    weights = interior.at[ends].set(spacing / 2)                            # → (N,)
-    return nodes, weights
+    # today (functax)
+    # wₙ = (μₙ₊₁ − μₙ₋₁)/2, half a tile at each end
+    trapezoid_rule = quad.trapezoid(nodes)                                  # → (N,)
+    return nodes, trapezoid_rule.weights
 
 
 # a = 1/(0.3 √2)
@@ -144,8 +140,10 @@ exact = {
 labels = ("GL band", "TR band", "GL ice", "TR ice")
 print(" N  " + "  ".join(f"{label:>8}" for label in labels))
 for n_nodes in (4, 8, 16, 32, 64):
-    # the Gauss–Legendre nodes and weights, and the trapezoid ones
-    gauss_nodes, gauss_weights = np.polynomial.legendre.leggauss(n_nodes)
+    # today (functax)
+    # the Gauss–Legendre nodes and weights on [−1, 1]
+    gauss_nodes, gauss_weights = quad.gauss_legendre(n_nodes)                # → (N,) ×2
+    # the trapezoid nodes and weights
     trap_nodes, trap_weights = trapezoid(n_nodes)
     errors = []
     for name, field in (("band", band), ("ice", ice)):

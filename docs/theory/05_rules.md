@@ -26,7 +26,7 @@ There are a few ways to weight each factor, and they put the sphere on either si
 - **Latitude, global.** A spectral model puts its latitudes at the Gauss–Legendre nodes in $\mu = \sin \phi$, with the Gauss weights. The measure $\cos \phi \mathrm{d}\phi$ is $\mathrm{d}\mu$, so this is the Gauss rule of chapter 3, exact for polynomials of degree $2 N_\phi - 1$ in $\mu$.
 - **Latitude, unweighted.** Equal weights on equal latitude bands, which is what a plain average does. It is not a rule for the sphere at all, since it integrates $\mathrm{d}\phi$ instead of $\cos \phi \mathrm{d}\phi$.
 
-We check all three on a toy temperature field with a pole-to-equator gradient and a wave in longitude, $T(\phi, \vartheta) = 288 - 30 \sin^2 \phi + 5 \cos \phi \cos \vartheta$ (in K). The wave averages to zero around every latitude circle, and $\sin^2 \phi$ averages to $1/3$ over the sphere, so the exact global mean is $\bar{T} = 278$ K. integrix takes a tuple of rules as a tensor rule, one per axis. Until functax's rules land (functax#44), a rule is any object with `nodes` and `weights`, so we define a two-field module for it.
+We check all three on a toy temperature field with a pole-to-equator gradient and a wave in longitude, $T(\phi, \vartheta) = 288 - 30 \sin^2 \phi + 5 \cos \phi \cos \vartheta$ (in K). The wave averages to zero around every latitude circle, and $\sin^2 \phi$ averages to $1/3$ over the sphere, so the exact global mean is $\bar{T} = 278$ K. integrix takes a tuple of rules as a tensor rule, one per axis. The Gauss–Legendre rule comes from `functax.quad`, and the longitude and band-area rules are built by hand as a `functax.quad.Rule`, which is just nodes and weights.
 
 ```python
 import jax
@@ -34,21 +34,13 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import einx
-import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import rule
 from jaxtyping import Array, Float
 
 # Shapes: N_φ latitudes; N_ϑ = 2 N_φ longitudes
-
-
-# user
-class Rule(eqx.Module):
-    """Nodes and weights: a stand-in for functax's rules (functax#44)."""
-
-    nodes: Float[Array, "node"]
-    weights: Float[Array, "node"]
 
 
 # user
@@ -88,7 +80,9 @@ for n_lat in (4, 8, 16, 32):
     width = full_turn / n_lon
     # wₖ for every longitude
     longitude_weights = jnp.full(n_lon, width)                  # → (N_ϑ,)
-    longitude_rule = Rule(longitude, longitude_weights)
+    # today (functax)
+    # the periodic trapezoid rule in longitude, as data
+    longitude_rule = quad.Rule(longitude, longitude_weights)
     # local: π/2, half of the latitude range
     half_pi = jnp.pi / 2
     # φⱼ₊½ = −π/2 + j π/N_φ, the band edges
@@ -103,14 +97,17 @@ for n_lat in (4, 8, 16, 32):
     sine_edges = jnp.sin(edges)                                 # → (N_φ + 1,)
     # wⱼ = sin φⱼ₊½ − sin φⱼ₋½
     band_areas = jnp.diff(sine_edges)                           # → (N_φ,)
-    cell_rule = Rule(centres, band_areas)
+    # today (functax)
+    # the exact band areas at the band centres, as a rule
+    cell_rule = quad.Rule(centres, band_areas)
+    # today (functax)
     # global: Gauss–Legendre in μ = sin φ, Pₙ(μⱼ) = 0
-    mu_nodes, mu_weights = np.polynomial.legendre.leggauss(n_lat)  # → (N_φ,) ×2
+    mu_nodes, mu_weights = quad.gauss_legendre(n_lat)          # → (N_φ,) ×2
     # φⱼ = arcsin μⱼ
     gauss_latitude = jnp.arcsin(mu_nodes)                       # → (N_φ,)
-    # wⱼ = Gauss weight, as a jax array
-    gauss_weights = jnp.asarray(mu_weights)                     # → (N_φ,)
-    gauss_rule = Rule(gauss_latitude, gauss_weights)
+    # today (functax)
+    # the Gauss weights at the latitudes φⱼ
+    gauss_rule = quad.Rule(gauss_latitude, jnp.asarray(mu_weights))
     # a plain average of the grid values, for comparison
     grid = temperature(centres, longitude)                      # → (N_φ, N_ϑ)
     # T̄_plain = mean over the grid

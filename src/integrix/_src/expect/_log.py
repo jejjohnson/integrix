@@ -10,6 +10,7 @@ from typing import Any
 import einx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad as functax_quad
 from jaxtyping import Array, ArrayLike, Float
 
 from integrix._src.rule._log import log_integrate
@@ -107,7 +108,8 @@ def log_simpson(
 
     Algorithm:
         1. A uniform grid uₖ on [log a, log b] with an odd number of nodes,
-           and Simpson's weights (h/3)(1, 4, 2, …, 4, 1) on the host.
+           and Simpson's weights (h/3)(1, 4, 2, …, 4, 1) from
+           ``functax.quad.simpson``.
         2. `integrix.rule.log_integrate` with those weights on
            log f(e^uₖ) + uₖ.
 
@@ -147,13 +149,9 @@ def log_simpson(
         )
     # uₖ, uniform in log q
     grid = np.linspace(math.log(lower), math.log(upper), count)
-    step = grid[1] - grid[0]
-    # (h/3)(1, 4, 2, …, 4, 1)
-    pattern = np.ones(count)
-    pattern[1:-1:2] = 4.0
-    pattern[2:-1:2] = 2.0
-    weights = jnp.asarray(pattern * step / 3.0, dtype=jnp.result_type(float))
-    log_grid = jnp.asarray(grid, dtype=weights.dtype)
+    log_grid = jnp.asarray(grid, dtype=jnp.result_type(float))
+    # (h/3)(1, 4, 2, …, 4, 1), functax's composite Simpson rule on the grid
+    weights = functax_quad.simpson(log_grid).weights
     # log f(e^uₖ) + uₖ: the Jacobian dq = eᵘ du
     log_values = einx.add("n ..., n -> n ...", log_fn(jnp.exp(log_grid)), log_grid)
     return log_integrate(weights, log_values, axis=0)

@@ -40,34 +40,20 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
-import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
 from integrix import rule, scan
 from jaxtyping import Array, Float
 
 # Shapes: N = 41 levels
 
 
-# user
-class Rule(eqx.Module):
-    """Nodes and weights: a stand-in for functax's rules (functax#44)."""
-
-    nodes: Float[Array, "node"]
-    weights: Float[Array, "node"]
-
-
 # zₙ, km, from the surface to the top
 height = jnp.linspace(0.0, 80.0, 41)                            # → (N,)
-# Δz = z₂ − z₁
-spacing = height[1] - height[0]                                 # → ()
-# Δz/2, the trapezoid weight at the ends
-half_spacing = spacing / 2                                      # → ()
-# the surface and top levels
-ends = jnp.array([0, -1])
+# today (functax)
 # wₙ = Δz, with Δz/2 at the ends
-weights = jnp.full(41, spacing).at[ends].set(half_spacing)      # → (N,)
-levels = Rule(height, weights)
+levels = quad.trapezoid(height)                                 # → (N,)
 # s = z/H_β
 scaled_height = height / 8.0                                    # → (N,)
 # β(z) = β₀ exp(−s), km⁻¹

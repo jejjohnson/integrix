@@ -1,45 +1,34 @@
-"""Test-only rules, standing in for functax's until functax#44 lands.
+"""Rules for the tests: functax's, under the names the tests use, and a bare one.
 
-integrix reads a rule's ``nodes`` and ``weights`` structurally (`RuleLike`),
-so these small modules exercise the same code path functax's ``Rule`` will.
-The weights follow the formulas in functax#44 and are checked against NumPy
-and SciPy here, so a test that uses them tests integrix, not the stand-in.
+`trapezoid_rule` and `gauss_legendre_rule` are functax.quad's `trapezoid` and
+`gauss_legendre` (functax#44, in functax 0.0.6), which replace the stand-ins the
+tests used before functax had rules. `StandInRule` stays as a bare module with
+``nodes`` and ``weights`` only: integrix reads a rule structurally (`RuleLike`),
+and some tests need a rule functax's `Rule` would reject (2-D weights inside a
+tensor rule) or one with weights that are not a quadrature rule's.
 """
 
 from __future__ import annotations
 
 import equinox as eqx
-import jax.numpy as jnp
-import numpy as np
-from jaxtyping import Array, Float
+import functax.quad as fx_quad
+from jaxtyping import Array, ArrayLike, Float
 
 
 class StandInRule(eqx.Module):
-    """Nodes and weights only, as functax's ``Rule`` is."""
+    """Nodes and weights only, the `RuleLike` protocol and nothing else."""
 
-    nodes: Float[Array, " node"]
-    weights: Float[Array, " node"]
+    nodes: Float[Array, " node *rest"]
+    weights: Float[Array, " node *rest"]
 
 
-def trapezoid_rule(nodes: Float[Array, " node"]) -> StandInRule:
-    """w₀ = (x₁ − x₀)/2, wₖ = (xₖ₊₁ − xₖ₋₁)/2, w_N = (x_N − x_{N−1})/2."""
-    nodes = jnp.asarray(nodes)
-    widths = jnp.diff(nodes)
-    zero = jnp.zeros(1, dtype=nodes.dtype)
-    left = jnp.concatenate([widths, zero])
-    right = jnp.concatenate([zero, widths])
-    return StandInRule(nodes=nodes, weights=0.5 * (left + right))
+def trapezoid_rule(nodes: Float[ArrayLike, " node"]) -> fx_quad.Rule:
+    """functax's composite trapezoid rule on the given nodes."""
+    return fx_quad.trapezoid(nodes)
 
 
 def gauss_legendre_rule(
     n_nodes: int, interval: tuple[float, float] = (-1.0, 1.0)
-) -> StandInRule:
-    """The n-point Gauss–Legendre rule on [a, b], mapped from NumPy's on [−1, 1]."""
-    reference_nodes, reference_weights = np.polynomial.legendre.leggauss(n_nodes)
-    lower, upper = interval
-    # x = (a + b)/2 + (b − a)/2 ξ, w = (b − a)/2 ω
-    half_width = 0.5 * (upper - lower)
-    nodes = 0.5 * (lower + upper) + half_width * reference_nodes
-    return StandInRule(
-        nodes=jnp.asarray(nodes), weights=jnp.asarray(half_width * reference_weights)
-    )
+) -> fx_quad.Rule:
+    """functax's n-point Gauss–Legendre rule on [a, b] (host-side float64)."""
+    return fx_quad.gauss_legendre(n_nodes, interval=interval)

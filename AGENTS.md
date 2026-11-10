@@ -62,7 +62,7 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 
 | You are about to write… | Use instead |
 |---|---|
-| Trapezoid, Simpson, Gauss–Legendre or Clenshaw–Curtis nodes and weights | functax's rules (`functax.quad`, functax#44); never a private copy here |
+| Trapezoid, Simpson, Gauss–Legendre or Clenshaw–Curtis nodes and weights, a rule along a transect | functax's rules (`functax.quad`: `trapezoid`, `simpson`, `gauss_legendre`, `clenshaw_curtis`, `polyline`); never a private copy here |
 | Gauss–Hermite, unscented or sigma-point expectations | gaussx |
 | A hand-written average over posterior draws, `scipy.stats.qmc`, importance weights | `integrix.expect.monte_carlo`, `qmc`, `importance` (an `Expectation` with a standard error) |
 | `scipy.integrate.quad`, `quadax.quadgk`, an integral to a tolerance inside a jitted model | `integrix.adapt.GaussKronrod` (an `Integral` with `error` and `converged`) |
