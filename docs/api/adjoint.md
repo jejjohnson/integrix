@@ -4,4 +4,6 @@ Adjoints through time: the backward sweeps of a forward run. A truncated rollout
 
 `truncated_scan` and `to_diffrax_adjoint` moved from pipekit-jax at `7d02d8e`, whose tests run against them.
 
+The theory is in the [Adjoints](../adjoints/) chapter of the mathematical reference.
+
 ::: integrix.adjoint
