@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5](https://github.com/jejjohnson/integrix/compare/v0.0.4...v0.0.5) (2026-11-10)
+
+
+### Features
+
+* **expect:** add the effective sample size and Pareto-smoothed log weights ([#74](https://github.com/jejjohnson/integrix/issues/74)) ([4701af4](https://github.com/jejjohnson/integrix/commit/4701af4c60fbaa2edfcfa99050effd8d2a49403d))
+* **rule, expect:** add log-space integration ([#73](https://github.com/jejjohnson/integrix/issues/73)) ([7438f7b](https://github.com/jejjohnson/integrix/commit/7438f7b8b95b828793d3db10cda6d0b9166e80f1))
+
 ## [0.0.4](https://github.com/jejjohnson/integrix/compare/v0.0.3...v0.0.4) (2026-11-10)
 
 
