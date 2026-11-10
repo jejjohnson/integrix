@@ -23,19 +23,7 @@ A function $f$ can carry extra axes that are not integrated (channels, time step
 
 ## Five integrals, one form
 
-The five integrals of the day all fit [](#eq-integral). [](#tbl-five-integrals) writes each one out in full and then reads off its domain $\Omega$ and its measure $\mathrm{d}\mu$, so that the integrand $f$ is whatever is left inside the integral. The last column is the integrix operation that computes it, and [](#tbl-day-symbols) defines the symbols.
-
-:::{table} The five integrals of one day of Earth observation, each written out in full and matched to the form $\int_\Omega f(\vect{s}) \mathrm{d}\mu(\vect{s})$ of [](#eq-integral).
-:label: tbl-five-integrals
-
-| Integral | Full form | Domain $\Omega$ | Measure $\mathrm{d}\mu$ | integrix |
-| --- | --- | --- | --- | --- |
-| band radiance $L_c$ | $L_c = \int_{\mathcal{S}} L(\lambda) R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda$ | wavelength $\mathcal{S}$ | $R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda$ | `weighted_mean` |
-| column average $\mathrm{XCH_4}$ | $\mathrm{XCH_4} = \frac{1}{p_\text{s}} \int_0^{p_\text{s}} c(p) \mathrm{d}p$ | pressure $[0, p_\text{s}]$ | $\mathrm{d}p / p_\text{s}$ | `integrate` |
-| global mean $\bar{T}$ | $\bar{T} = \frac{1}{4 \pi} \int_0^{2 \pi} \int_{-\pi/2}^{\pi/2} T(\phi, \vartheta) \cos \phi \mathrm{d}\phi \mathrm{d}\vartheta$ | the sphere $\mathbb{S}^2$ | $\cos \phi \mathrm{d}\phi \mathrm{d}\vartheta / 4 \pi$ | `integrate` with a tensor rule |
-| ocean heat content $\mathrm{OHC}$ | $\mathrm{OHC} = \rho_0 c_p \int_{-H}^{0} \Theta(z) \mathrm{d}z$ | depth $[-H, 0]$ | $\rho_0 c_p \mathrm{d}z$ | `integrate`, or `cumulative` for the profile |
-| expected emission rate $\mathbb{E}[Q \mid \vect{y}]$ | $\mathbb{E}[Q \mid \vect{y}] = \int_0^\infty Q p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$ | rates $\mathbb{R}_{>0}$ | $p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$ | `monte_carlo`, `qmc` |
-:::
+The five integrals of the day all fit [](#eq-integral). For each one we write the full form, then read off its domain $\Omega$, its measure $\mathrm{d}\mu$ and the integrand $f$ that is left inside, and name the integrix function that computes it. [](#tbl-day-symbols) collects the physical symbols.
 
 :::{table} The physical symbols of this page, with their shapes and units.
 :label: tbl-day-symbols
@@ -55,7 +43,35 @@ The five integrals of the day all fit [](#eq-integral). [](#tbl-five-integrals) 
 | $p_\text{post}(Q \mid \vect{y})$ | $\mathbb{R}_{\ge 0}$, h kg⁻¹ | the posterior density of the emission rate, labelled because $p$ is pressure on this page |
 :::
 
-We should be careful with two of these. The column average assumes dry air and a constant gravity, so that a pressure interval is proportional to the mass of air in it; a real retrieval adds water vapour and an averaging kernel on top. The band radiance is a ratio of two integrals with the same measure, which is why it has its own function: both sums must use the same weights, or the ratio drifts for a reason that has nothing to do with the spectrum.
+**Band radiance.** An imaging spectrometer never sees the spectrum itself, since each channel sees the spectrum averaged under its own spectral response. We have the full form
+
+$$L_c = \frac{\int_{\mathcal{S}} L(\lambda) R_c(\lambda) \mathrm{d}\lambda}{\int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda}$$ (eq-band-radiance)
+
+where the domain is the spectral window $\mathcal{S}$, the integrand is the spectrum $L(\lambda)$, and the measure is the normalised response $R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda$. It is a ratio of two integrals with the same measure, so integrix computes it with [`weighted_mean`](xref:api#integrix.rule.weighted_mean), which uses the same weights for both sums. If the two sums used different weights, the ratio would drift for a reason that has nothing to do with the spectrum.
+
+**Column average.** A retrieval reports methane as a column-averaged dry-air mole fraction, which is what a model column has to be compared with. Assuming dry air and a constant gravity, a pressure interval is proportional to the mass of air in it, and we have the full form
+
+$$\mathrm{XCH_4} = \frac{1}{p_\text{s}} \int_0^{p_\text{s}} c(p) \mathrm{d}p$$ (eq-xch4)
+
+where the domain is the column $[0, p_\text{s}]$ from the top of the atmosphere to the surface, the integrand is the mole fraction $c(p)$, and the measure is $\mathrm{d}p / p_\text{s}$, the fraction of the column's air in each pressure interval. It is a plain [`integrate`](xref:api#integrix.rule.integrate) over the levels. A real retrieval adds water vapour and an averaging kernel on top, which change the weights but not the form.
+
+**Global mean.** A level-3 map is averaged to one number per day, and every cell has to count by its area, not by its index. We have the full form
+
+$$\bar{T} = \frac{1}{4 \pi} \int_0^{2 \pi} \int_{-\pi/2}^{\pi/2} T(\phi, \vartheta) \cos \phi \mathrm{d}\phi \mathrm{d}\vartheta$$ (eq-global-mean)
+
+where the domain is the unit sphere $\mathbb{S}^2$ in latitude $\phi$ and longitude $\vartheta$, the integrand is the surface temperature $T(\phi, \vartheta)$, and the measure is the area element $\cos \phi \mathrm{d}\phi \mathrm{d}\vartheta$ divided by the sphere's area $4 \pi$. The measure is a product of one factor per axis, so integrix computes it with [`integrate`](xref:api#integrix.rule.integrate) and a tensor rule, one rule in latitude and one in longitude.
+
+**Ocean heat content.** The heat stored in the upper ocean is the quantity behind most statements about ocean warming, and it comes from a temperature profile. We have the full form
+
+$$\mathrm{OHC} = \rho_0 c_p \int_{-H}^{0} \Theta(z) \mathrm{d}z$$ (eq-ohc)
+
+where the domain is the layer $[-H, 0]$ from depth $H$ to the sea surface, the integrand is the potential temperature $\Theta(z)$, and the measure is $\rho_0 c_p \mathrm{d}z$, the heat capacity of each slab of water. The total is an [`integrate`](xref:api#integrix.rule.integrate) over depth, and the heat content above every depth, a profile instead of a number, is a [`cumulative`](xref:api#integrix.scan.cumulative) scan.
+
+**Expected emission rate.** An inversion does not return one emission rate for a plume but a posterior over rates, and the number we report is its mean, with an uncertainty from the same posterior. We have the full form
+
+$$\mathbb{E}[Q \mid \vect{y}] = \int_0^\infty Q p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$$ (eq-expected-rate)
+
+where the domain is the positive rates $\mathbb{R}_{>0}$, the integrand is the rate $Q$ itself, and the measure is the posterior $p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$ given the observations $\vect{y}$. We can usually sample the posterior but not write it down, so integrix computes this with [`monte_carlo`](xref:api#integrix.expect.monte_carlo) on posterior samples, or with [`qmc`](xref:api#integrix.expect.qmc) when the rate is a transform of uniform variables.
 
 ## Three properties we lean on
 
