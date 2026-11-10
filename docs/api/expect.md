@@ -6,4 +6,6 @@ integrix averages; sampling from a posterior stays in NumPyro and pyrox.
 
 The theory is in the [Expectations](../expectations/) chapter of the mathematical reference.
 
+For integrands that underflow, two conveniences return log-integrals through `integrix.rule.log_integrate`. `log_gauss_hermite` computes $\log \mathbb{E}[f(Q)]$ for a lognormal $Q$ by Gauss–Hermite quadrature in $\log Q$, and `log_simpson` computes $\log \int_a^b f(q) \mathrm{d}q$ by Simpson's rule on a uniform grid in $\log q$, which resolves a lognormal body and a power-law tail alike.
+
 ::: integrix.expect
