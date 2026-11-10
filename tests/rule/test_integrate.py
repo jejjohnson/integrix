@@ -500,6 +500,86 @@ class TestMaskAndNan:
             )
 
 
+def _band_scene(seed: int = 0) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Trapezoid weights on G = 9 wavelengths, P = 4 spectra and B = 3 responses."""
+    rng = np.random.default_rng(seed)
+    weights = trapezoid_rule(_random_nodes(9, seed=seed)).weights
+    radiance = jnp.asarray(rng.uniform(0.5, 1.5, (4, 9)))
+    responses = jnp.asarray(rng.uniform(0.0, 1.0, (3, 9)))
+    return weights, radiance, responses
+
+
+class TestBatchedWeight:
+    """Gate G6-batch: a batch of weight functions in ``weighted_mean`` (#49)."""
+
+    @pytest.mark.parametrize("seed", [0, 1])
+    def test_equals_the_vmap_over_bands(self, seed: int) -> None:
+        weights, radiance, responses = _band_scene(seed)
+        bands = weighted_mean(weights, radiance, weight=responses)
+        looped = jax.vmap(
+            lambda response: weighted_mean(weights, radiance, weight=response)
+        )(responses)
+        assert bands.shape == (4, 3)
+        np.testing.assert_allclose(bands, looped.T, rtol=1e-14)
+
+    def test_several_leading_axes_keep_their_shape(self) -> None:
+        weights, radiance, responses = _band_scene()
+        stacked = jnp.stack([responses, 2.0 * responses])
+        bands = weighted_mean(weights, radiance, weight=stacked)
+        assert bands.shape == (4, 2, 3)
+        # scaling a weight function leaves its mean unchanged
+        np.testing.assert_allclose(bands[:, 0], bands[:, 1], rtol=1e-14)
+
+    def test_a_tensor_rule_takes_a_batch_of_grid_weights(self) -> None:
+        rule = trapezoid_rule(jnp.linspace(0.0, 1.0, 4))
+        field = jnp.arange(16.0).reshape(4, 4)
+        masks = jnp.stack([jnp.ones((4, 4)), jnp.eye(4)])
+        means = weighted_mean((rule, rule), field, weight=masks, axis=(0, 1))
+        assert means.shape == (2,)
+        one_by_one = [
+            weighted_mean((rule, rule), field, weight=mask, axis=(0, 1))
+            for mask in masks
+        ]
+        np.testing.assert_allclose(means, one_by_one, rtol=1e-14)
+
+    def test_composes_with_a_mask_and_nan_policy(self) -> None:
+        weights, radiance, responses = _band_scene()
+        cloudy = radiance.at[0, 2].set(jnp.nan)
+        valid = jnp.ones((4, 9), bool).at[1, :3].set(False)
+        bands = weighted_mean(
+            weights, cloudy, weight=responses, where=valid, nan_policy="omit"
+        )
+        looped = jax.vmap(
+            lambda response: weighted_mean(
+                weights, cloudy, weight=response, where=valid, nan_policy="omit"
+            )
+        )(responses)
+        assert bool(jnp.all(jnp.isfinite(bands)))
+        np.testing.assert_allclose(bands, looped.T, rtol=1e-14)
+
+    def test_a_weight_with_the_values_shape_is_read_per_sample(self) -> None:
+        weights = jnp.ones(3)
+        radiance = jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        response = jnp.eye(3)
+        # (3, 3) is both the values' shape and a batch of three responses
+        band = weighted_mean(weights, radiance, weight=response)
+        np.testing.assert_allclose(band, [1.0, 5.0, 9.0])
+
+    @pytest.mark.slow
+    def test_gradient_in_the_responses_matches_finite_differences(self) -> None:
+        weights, radiance, responses = _band_scene()
+
+        def bands(response: jax.Array) -> jax.Array:
+            return weighted_mean(weights, radiance, weight=response)
+
+        assert_grad_matches_fd(bands, responses)
+
+    def test_rejects_a_weight_whose_trailing_axes_are_not_the_rule(self) -> None:
+        weights, radiance, _ = _band_scene()
+        with pytest.raises(ix.ValidationError, match="with or without leading axes"):
+            weighted_mean(weights, radiance, weight=jnp.ones((3, 8)))
+
+
 class TestValidation:
     def test_rejects_an_empty_tensor_rule(self) -> None:
         with pytest.raises(ix.ValidationError, match="at least one rule"):

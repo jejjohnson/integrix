@@ -201,11 +201,14 @@ def weighted_mean(
     L̄ = ∫ L(x) R(x) dx / ∫ R(x) dx ≈ ∑ₙ wₙ Rₙ Lₙ / ∑ₙ wₙ Rₙ, a band radiance
     from a spectrum L and a spectral response R, say. With a mask or
     ``nan_policy="omit"``, both sums run over the kept samples K only, so the
-    mean renormalises: ∑ over K of wₙ Rₙ Lₙ / ∑ over K of wₙ Rₙ.
+    mean renormalises: ∑ over K of wₙ Rₙ Lₙ / ∑ over K of wₙ Rₙ. A batch of
+    weight functions R_b (an instrument's band responses) gives one mean per
+    b, L̄_b = ∑ₙ wₙ R_bn Lₙ / ∑ₙ wₙ R_bn.
 
     Algorithm:
         1. Place R along the integrated axes (or use it as given when it has
-           the values' shape).
+           the values' shape); a batch of weight functions keeps its leading
+           axes.
         2. Keep the samples as `integrate` does, with 0 in place of the
            others in both sums.
         3. Sum wₙ Rₙ Lₙ and wₙ Rₙ pairwise with the same weights.
@@ -216,9 +219,11 @@ def weighted_mean(
             array w, as in `integrate`.
         values: The values Lₙ.
         weight: The weight function Rₙ, with the shape of ``values`` (one per
-            sample, laid out like the values) or of the rule's weights (one
-            per node, in the rule's order). A weight that has both shapes is
-            read per sample.
+            sample, laid out like the values), of the rule's weights (one per
+            node, in the rule's order), or of the rule's weights with extra
+            leading axes (a batch of weight functions, such as B band
+            responses). The checks run in that order, so a weight with the
+            values' shape is always read per sample.
         axis: The axes to average over, as in `integrate`.
         where: A boolean mask that broadcasts against the values, as in
             `integrate`.
@@ -227,12 +232,14 @@ def weighted_mean(
 
     Returns:
         The weighted mean, with the shape of ``values`` without the averaged
-        axes. A weight that sums to zero, or a mean with no kept sample,
-        gives ``nan``.
+        axes, followed by a batch of weights' leading axes: radiance (P, G)
+        and responses (B, G) give (P, B). A weight that sums to zero, or a
+        mean with no kept sample, gives ``nan``.
 
     Raises:
         ValidationError: As `integrate`, or if ``weight`` has neither the
-            weights' shape nor the values' shape.
+            values' shape nor the weights' shape, with or without leading
+            axes.
 
     Examples:
         >>> import jax.numpy as jnp
@@ -250,6 +257,18 @@ def weighted_mean(
         ...     weights, cloudy, weight=response, nan_policy="omit"
         ... )
         >>> bool(jnp.allclose(band, jnp.array([2.0])))
+        True
+
+        Three band responses at once, one mean per pixel and band:
+
+        >>> responses = jnp.array(
+        ...     [[0.0, 1.0, 1.0], [1.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+        ... )
+        >>> bands = weighted_mean(weights, radiance, weight=responses)
+        >>> bands.shape
+        (2, 3)
+        >>> expected = jnp.array([[7.0 / 3.0, 1.0, 2.0], [2.0, 2.0, 2.0]])
+        >>> bool(jnp.allclose(bands, expected))
         True
     """
     weights, _ = _read_rule(rule)
@@ -287,10 +306,17 @@ def weighted_mean(
         else:
             # ∑ over K of wₙ Rₙ, one sum per batch entry
             denominator = _contract(combined, kept.astype(dtype))
+    elif (
+        weight.ndim > weights.ndim
+        and weight.shape[weight.ndim - weights.ndim :] == weights.shape
+    ):
+        response = weight.astype(dtype)
+        return _batched_mean(flat_weights, response, weights.ndim, samples, kept)
     else:
         raise ValidationError(
-            f"'weight' must have the rule's weights shape {weights.shape} or the "
-            f"values' shape {values.shape}, got {weight.shape}"
+            f"'weight' must have the values' shape {values.shape} or the rule's "
+            f"weights shape {weights.shape}, with or without leading axes, got "
+            f"{weight.shape}"
         )
     # L̄ = ∑ wR L / ∑ wR
     return numerator / denominator
@@ -340,6 +366,42 @@ def _read_rule(rule: Rule) -> tuple[Inexact[Array, ...], Any]:
             f"shape {weights.shape}"
         )
     return as_inexact(weights), nodes
+
+
+def _batched_mean(
+    flat_weights: Inexact[Array, " node"],
+    weight: Inexact[Array, " ..."],
+    rule_ndim: int,
+    samples: Inexact[Array, " node *rest"],
+    kept: Bool[Array, " node *rest"] | None,
+) -> Inexact[Array, " ..."]:
+    """L̄_b = ∑ₙ wₙ R_bn Lₙ / ∑ₙ wₙ R_bn for a batch of weight functions R_b."""
+    batch_shape = weight.shape[: weight.ndim - rule_ndim]
+    batch_names = " ".join(f"b{position}" for position in range(len(batch_shape)))
+    node_names = " ".join(f"n{position}" for position in range(rule_ndim))
+    # Any: einx reads every keyword as an axis size or its backend
+    sizes: dict[str, Any] = {
+        f"b{position}": size for position, size in enumerate(batch_shape)
+    }
+    # (B…, G…) → (M, N): one row per weight function, the rule's axes flattened
+    flatten_pattern = f"{batch_names} {node_names} -> ({batch_names}) ({node_names})"
+    responses = einx.id(flatten_pattern, weight)
+    # wₙ R_bn
+    combined = einx.multiply("m n, n -> m n", responses, flat_weights)
+    # tₙ = wₙ R_bn Lₙ, laid out (N, …, M) and summed pairwise over N
+    terms = einx.multiply("n ..., m n -> n ... m", samples, combined)
+    numerator = pairwise_sum(terms)
+    if kept is None:
+        # ∑ₙ wₙ R_bn, the same for every batch entry of the values
+        denominator = pairwise_sum(einx.id("m n -> n m", combined))
+    else:
+        # ∑ over K of wₙ R_bn, one per batch entry and weight function
+        kept_weights = kept.astype(combined.dtype)
+        kept_terms = einx.multiply("n ..., m n -> n ... m", kept_weights, combined)
+        denominator = pairwise_sum(kept_terms)
+    # L̄_b = ∑ wR L / ∑ wR, then (…, M) → (…, B…)
+    mean = numerator / denominator
+    return einx.id(f"... ({batch_names}) -> ... {batch_names}", mean, **sizes)
 
 
 def _kept_samples(
