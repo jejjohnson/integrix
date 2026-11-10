@@ -23,15 +23,22 @@ A function $f$ can carry extra axes that are not integrated (channels, time step
 
 ## Five integrals, one form
 
-The five integrals of the day all fit [](#eq-integral). The first table gives each one its domain, its measure and the integrix operation that computes it, and the symbols are in the table that follows.
+The five integrals of the day all fit [](#eq-integral). [](#tbl-five-integrals) writes each one out in full and then reads off its domain $\Omega$ and its measure $\mathrm{d}\mu$, so that the integrand $f$ is whatever is left inside the integral. The last column is the integrix operation that computes it, and [](#tbl-day-symbols) defines the symbols.
 
-| Integral | Domain $\Omega$ | Measure $\mathrm{d}\mu$ | integrix |
-| --- | --- | --- | --- |
-| band radiance $L_c$ | wavelength $\mathcal{S}$ | $R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c \mathrm{d}\lambda$ | `weighted_mean` |
-| column average $\mathrm{XCH_4}$ | pressure $[0, p_\text{s}]$ | $\mathrm{d}p / p_\text{s}$ | `integrate` |
-| global mean $\bar{T}$ | the sphere $\mathbb{S}^2$ | $\mathrm{d}A / 4\pi$, with $\mathrm{d}A = \cos \phi \mathrm{d}\phi$ times the longitude element | `integrate` with a tensor rule |
-| ocean heat content $\mathrm{OHC}$ | depth $[-H, 0]$ | $\rho_0 c_p \mathrm{d}z$ | `integrate`, or `cumulative` for the profile |
-| expected emission rate $\mathbb{E}[Q]$ | rates $\mathbb{R}_{>0}$ | the posterior $p(Q \mid \vect{y}) \mathrm{d}Q$ | `monte_carlo`, `qmc` |
+:::{table} The five integrals of one day of Earth observation, each written out in full and matched to the form $\int_\Omega f(\vect{s}) \mathrm{d}\mu(\vect{s})$ of [](#eq-integral).
+:label: tbl-five-integrals
+
+| Integral | Full form | Domain $\Omega$ | Measure $\mathrm{d}\mu$ | integrix |
+| --- | --- | --- | --- | --- |
+| band radiance $L_c$ | $L_c = \int_{\mathcal{S}} L(\lambda) R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda$ | wavelength $\mathcal{S}$ | $R_c(\lambda) \mathrm{d}\lambda / \int_{\mathcal{S}} R_c(\lambda) \mathrm{d}\lambda$ | `weighted_mean` |
+| column average $\mathrm{XCH_4}$ | $\mathrm{XCH_4} = \frac{1}{p_\text{s}} \int_0^{p_\text{s}} c(p) \mathrm{d}p$ | pressure $[0, p_\text{s}]$ | $\mathrm{d}p / p_\text{s}$ | `integrate` |
+| global mean $\bar{T}$ | $\bar{T} = \frac{1}{4 \pi} \int_0^{2 \pi} \int_{-\pi/2}^{\pi/2} T(\phi, \vartheta) \cos \phi \mathrm{d}\phi \mathrm{d}\vartheta$ | the sphere $\mathbb{S}^2$ | $\cos \phi \mathrm{d}\phi \mathrm{d}\vartheta / 4 \pi$ | `integrate` with a tensor rule |
+| ocean heat content $\mathrm{OHC}$ | $\mathrm{OHC} = \rho_0 c_p \int_{-H}^{0} \Theta(z) \mathrm{d}z$ | depth $[-H, 0]$ | $\rho_0 c_p \mathrm{d}z$ | `integrate`, or `cumulative` for the profile |
+| expected emission rate $\mathbb{E}[Q \mid \vect{y}]$ | $\mathbb{E}[Q \mid \vect{y}] = \int_0^\infty Q p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$ | rates $\mathbb{R}_{>0}$ | $p_\text{post}(Q \mid \vect{y}) \mathrm{d}Q$ | `monte_carlo`, `qmc` |
+:::
+
+:::{table} The physical symbols of this page, with their shapes and units.
+:label: tbl-day-symbols
 
 | Symbol | Shape, units | Meaning |
 | --- | --- | --- |
@@ -40,13 +47,15 @@ The five integrals of the day all fit [](#eq-integral). The first table gives ea
 | $R_c(\lambda)$ | $\mathbb{R}_{\ge 0}$ | the spectral response of channel $c$ |
 | $p$, $p_\text{s}$ | $\mathbb{R}_{\ge 0}$, hPa | pressure and surface pressure |
 | $c(p)$ | $\mathbb{R}_{>0}$, ppb | the methane dry-air mole fraction |
-| $\phi$ | radians | latitude |
+| $\phi$, $\vartheta$ | radians | latitude and longitude |
 | $T$, $\Theta$ | K, °C | surface temperature and ocean potential temperature |
 | $z$, $H$ | m | height (negative below the sea surface) and the depth of the layer |
 | $\rho_0$, $c_p$ | kg m⁻³, J kg⁻¹ K⁻¹ | reference density and heat capacity of seawater |
 | $Q$, $\vect{y}$ | kg h⁻¹, $\mathbb{R}^{D_y}$ | the emission rate and the observations it is inferred from |
+| $p_\text{post}(Q \mid \vect{y})$ | $\mathbb{R}_{\ge 0}$, h kg⁻¹ | the posterior density of the emission rate, labelled because $p$ is pressure on this page |
+:::
 
-We should be careful with two of these. The column average assumes dry air and a constant gravity, so that a pressure interval is proportional to the mass of air in it and $\mathrm{XCH_4} = \frac{1}{p_\text{s}} \int_0^{p_\text{s}} c(p) \mathrm{d}p$; a real retrieval adds water vapour and an averaging kernel on top. The band radiance is a ratio of two integrals with the same measure, which is why it has its own function: both sums must use the same weights, or the ratio drifts for a reason that has nothing to do with the spectrum.
+We should be careful with two of these. The column average assumes dry air and a constant gravity, so that a pressure interval is proportional to the mass of air in it; a real retrieval adds water vapour and an averaging kernel on top. The band radiance is a ratio of two integrals with the same measure, which is why it has its own function: both sums must use the same weights, or the ratio drifts for a reason that has nothing to do with the spectrum.
 
 ## Three properties we lean on
 

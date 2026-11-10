@@ -23,7 +23,10 @@ $$\hat{I}_N[f] = \sum_{n=1}^{N} w_n f(\vect{s}_n) = \vect{w}^\top \vect{f}$$ (eq
 
 where $\vect{w} \in \mathbb{R}^N$ holds the weights and $\vect{f} \in \mathbb{R}^N$ the samples $f_n = f(\vect{s}_n)$. The error of the rule is $E_N[f] = I[f] - \hat{I}_N[f]$. The measure of chapter 1 goes into the weights: a rule for $\int_0^{p_\text{s}} c(p) \mathrm{d}p / p_\text{s}$ is a rule for $\mathrm{d}p$ divided by $p_\text{s}$, which is how the $h_n$ of [](#eq-xch4-sum) come about.
 
-There are only a few ways to choose the weights, and the six modules of integrix use all of them.
+There are only a few ways to choose the weights, and the six modules of integrix use all of them ([](#tbl-modules-weights)).
+
+:::{table} How each integrix module chooses the weights $w_n$ of [](#eq-rule), with a geoscience example of each.
+:label: tbl-modules-weights
 
 | Module | How the weights are chosen | Geoscience example |
 | --- | --- | --- |
@@ -33,8 +36,9 @@ There are only a few ways to choose the weights, and the six modules of integrix
 | `adapt` | after looking at $f$: more nodes where the local error is large | a narrow absorption line |
 | `expect` | random nodes, with weights $1/N$ or importance ratios | an ensemble of emission rates |
 | `adjoint` | the same weights, read backwards, since $\partial \hat{I}_N / \partial f_n = w_n$ | the sensitivity of a column to each level |
+:::
 
-The rest of this chapter is about the first row, because the others are built from it.
+The rest of this chapter is about the first row of [](#tbl-modules-weights), because the others are built from it.
 
 ## Interpolatory weights
 

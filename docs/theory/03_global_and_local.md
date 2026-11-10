@@ -158,6 +158,11 @@ A global rule cannot do this without becoming local, by splitting the domain at 
 
 ## Which one to use
 
+[](#tbl-global-local) collects the differences between the two families.
+
+:::{table} Global and local rules side by side: where the nodes go, how the error falls, and how each one treats kinks, bad samples, budgets and refinement.
+:label: tbl-global-local
+
 | | Global rule | Local (composite) rule |
 | --- | --- | --- |
 | nodes | fixed by the rule (Gauss latitudes, Chebyshev points) | wherever the data are, on tiles |
@@ -166,5 +171,6 @@ A global rule cannot do this without becoming local, by splitting the domain at 
 | one bad sample | moves the estimate by its weight, anywhere | moves only its own tile |
 | budgets | one number for the domain | one number per tile, which add up to the domain's ([](#eq-additivity)) |
 | refinement | all nodes move, the old samples are not reused | split the tiles that need it (chapter 8) |
+:::
 
-Neither column wins. Spectral dynamical cores, the trapezoid rule in longitude and the Gauss rules of gaussx's Gaussian expectations live in the left column, because their integrands are smooth on the whole domain and the nodes are ours to choose. Finite-volume models, satellite swaths, retrievals on fixed levels and anything with a coastline live in the right column, because the data come on their own grid and the budgets must close cell by cell. The same split comes back in time (a Runge–Kutta step is a local rule in time, chapter 7), in adaptivity (local error estimates against a global tolerance, chapter 8) and in high dimensions, where Monte Carlo trades both for a rate that does not depend on the dimension (chapter 10).
+Neither column of [](#tbl-global-local) wins. Spectral dynamical cores, the trapezoid rule in longitude and the Gauss rules of gaussx's Gaussian expectations live in the left column, because their integrands are smooth on the whole domain and the nodes are ours to choose. Finite-volume models, satellite swaths, retrievals on fixed levels and anything with a coastline live in the right column, because the data come on their own grid and the budgets must close cell by cell. The same split comes back in time (a Runge–Kutta step is a local rule in time, chapter 7), in adaptivity (local error estimates against a global tolerance, chapter 8) and in high dimensions, where Monte Carlo trades both for a rate that does not depend on the dimension (chapter 10).

@@ -6,6 +6,9 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 
 ## Domains, nodes and sizes
 
+:::{table} The domain, its nodes and the sizes used on every page.
+:label: tbl-notation-domains
+
 | Symbol | Shape | Meaning | In code |
 | --- | --- | --- | --- |
 | $\Omega$, $\vect{s}$ | $\vect{s} \in \Omega \subset \mathbb{R}^{D_s}$ | the domain of integration and a point in it | |
@@ -15,8 +18,12 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 | $\Omega^{(r)}$, $N_\text{tile}$ | | a tile of a partition of $\Omega$, and the number of tiles | |
 | $h$ | $\mathbb{R}_{>0}$ | the width of a tile, or a step | |
 | $D_z$, $d$ | | the number of basis functions, and one of them | `basis` dim |
+:::
 
 ## Integrals and rules
+
+:::{table} The integral, a rule's estimate and error, and the symbols of exactness and convergence.
+:label: tbl-notation-rules
 
 | Symbol | Shape | Meaning | In code |
 | --- | --- | --- | --- |
@@ -30,8 +37,12 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 | $\mat{V}$, $\vect{b}$ | $N \times N$, $\mathbb{R}^N$ | the moment matrix $[\mat{V}]_{mn} = s_n^m$ and the moments $b_m$ [](#eq-moments) | |
 | $q$ | | the order of a local rule, $E_N = O(h^q)$ | |
 | $\rho$ | $\mathbb{R}_{>1}$ | the Bernstein-ellipse parameter of a global rule's rate [](#eq-gauss-rate) | |
+:::
 
 ## Bases and read-outs
+
+:::{table} Bases, coefficients and read-outs from chapter 4.
+:label: tbl-notation-bases
 
 | Symbol | Shape | Meaning | In code |
 | --- | --- | --- | --- |
@@ -41,6 +52,7 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 | $\vect{v}$ | $\mathbb{R}^{D_z}$ | the integrals of the basis functions [](#eq-basis-integral) | |
 | $\mat{H}$ | $N_\text{target} \times N_\text{source}$ | a read-out from source values to target values | `functax.interp.Stencil` |
 | $\vect{c}$ | $\mathbb{R}^{N_\text{source}}$ | the source values of a read-out | |
+:::
 
 ## Physical symbols
 
