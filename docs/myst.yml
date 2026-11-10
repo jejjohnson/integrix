@@ -54,6 +54,10 @@ project:
             - file: theory/08_adaptivity.md
             - file: theory/09_adjoints.md
             - file: theory/10_expectations.md
+            - file: theory/11_precision.md
+        - title: End-to-end example
+          children:
+            - file: theory/13_methane_example.md
         - title: Reference
           children:
             - file: theory/notation.md
