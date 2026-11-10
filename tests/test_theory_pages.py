@@ -1,6 +1,7 @@
-"""The code on the theory pages runs, and prints what the pages say it prints.
+"""The code on the theory and guide pages runs, and prints what the pages say.
 
-Every number quoted in `docs/theory/` comes from a ``python`` block on the page.
+Every number quoted in `docs/theory/` and `docs/guide/` comes from a ``python``
+block on the page.
 A block followed by a ``text`` block must print exactly that text. Each page runs
 in its own interpreter, top to bottom in one namespace, so a page that turns on
 64-bit mode does so for itself only.
@@ -20,8 +21,8 @@ from pathlib import Path
 import pytest
 
 
-THEORY = Path(__file__).resolve().parent.parent / "docs" / "theory"
-PAGES = sorted(THEORY.glob("[0-9][0-9]_*.md"))
+DOCS = Path(__file__).resolve().parent.parent / "docs"
+PAGES = sorted(DOCS.glob("theory/[0-9][0-9]_*.md")) + sorted(DOCS.glob("guide/*.md"))
 # A ``python`` block, then (after blank lines only) an optional ``text`` block.
 BLOCK = re.compile(
     r"^```python\n(?P<code>.*?)^```\n(?:\s*^```text\n(?P<output>.*?)^```\n)?",
