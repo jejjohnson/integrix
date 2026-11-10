@@ -37,60 +37,124 @@ jax.config.update("jax_enable_x64", True)
 import einx
 import jax.numpy as jnp
 from integrix import adapt, rule
+from jaxtyping import Array, Float
 
 # Shapes: N_φ = 180 latitudes; N_ϑ = 360 longitudes
 
-edges = jnp.linspace(-jnp.pi / 2, jnp.pi / 2, 181)  # → (N_φ + 1,)
-latitude = 0.5 * (edges[1:] + edges[:-1])  # → (N_φ,)
-longitude = jnp.arange(360) * 2.0 * jnp.pi / 360  # → (N_ϑ,)
+# φⱼ₊½ evenly spaced from −π/2 to π/2
+edges = jnp.linspace(-jnp.pi / 2, jnp.pi / 2, 181)                   # → (N_φ + 1,)
+# φⱼ₊½ + φⱼ₋½
+edge_sum = edges[1:] + edges[:-1]                                    # → (N_φ,)
+# φⱼ = (φⱼ₊½ + φⱼ₋½)/2
+latitude = 0.5 * edge_sum                                            # → (N_φ,)
+# ϑₖ = 2π k / 360
+longitude = jnp.arange(360) * 2.0 * jnp.pi / 360                     # → (N_ϑ,)
+# sin φⱼ₊½
+sine_edges = jnp.sin(edges)                                          # → (N_φ + 1,)
+# Δⱼ = sin φⱼ₊½ − sin φⱼ₋½
+band_areas = jnp.diff(sine_edges)                                    # → (N_φ,)
+# Δϑ/2π = 1/360 per column
+uniform = jnp.full(360, 1.0 / 360)                                   # → (N_ϑ,)
+# Δⱼ Δϑ/2π
+product = einx.multiply("lat, lon -> lat lon", band_areas, uniform)  # → (N_φ, N_ϑ)
 # wⱼₖ = (sin φⱼ₊½ − sin φⱼ₋½) Δϑ / 4π, so ∑ wⱼₖ = 1
-band_areas = jnp.diff(jnp.sin(edges))  # → (N_φ,)
-area = einx.multiply("lat, lon -> lat lon", band_areas, jnp.full(360, 1.0 / 360)) / 2.0
-shape = 1.0 - 3.0 * jnp.sin(latitude) ** 2  # → (N_φ,)
-wave = einx.multiply("lat, lon -> lat lon", jnp.cos(latitude), jnp.cos(3.0 * longitude))
+area = product / 2.0                                                 # → (N_φ, N_ϑ)
+# sin φⱼ
+sine_lat = jnp.sin(latitude)                                         # → (N_φ,)
+# Pⱼ = 1 − 3 sin²φⱼ
+shape = 1.0 - 3.0 * sine_lat**2                                      # → (N_φ,)
+# cos φⱼ
+cos_lat = jnp.cos(latitude)                                          # → (N_φ,)
+# 3ϑₖ
+triple = 3.0 * longitude                                             # → (N_ϑ,)
+# cos 3ϑₖ
+cos_triple = jnp.cos(triple)                                         # → (N_ϑ,)
+# Wⱼₖ = cos φⱼ cos 3ϑₖ
+wave = einx.multiply("lat, lon -> lat lon", cos_lat, cos_triple)     # → (N_φ, N_ϑ)
 
 
-def flux(mean, pole_to_equator, wave_amplitude):
+# user
+def flux(
+    mean: float,
+    pole_to_equator: float,
+    wave_amplitude: float,
+) -> Float[Array, "row col"]:
     """F(φ, ϑ) = F̄ + a (1 − 3 sin²φ) + b cos φ cos 3ϑ, in W m⁻²."""
-    # user
-    zonal = mean + pole_to_equator * shape  # → (N_φ,)
-    return einx.add("lat, lat lon -> lat lon", zonal, wave_amplitude * wave)
+    # a Pⱼ
+    tilt = pole_to_equator * shape                                   # → (N_φ,)
+    # Fⱼ = F̄ + a Pⱼ
+    zonal = mean + tilt                                              # → (N_φ,)
+    # b Wⱼₖ
+    ripple = wave_amplitude * wave                                   # → (N_φ, N_ϑ)
+    # Fⱼₖ = Fⱼ + b Wⱼₖ
+    return einx.add("lat, lat lon -> lat lon", zonal, ripple)
 
 
-incoming = flux(340.0, 100.0, 0.0)
-reflected = flux(100.0, 30.0, 5.0)
-outgoing = flux(239.3, 40.0, 8.0)
-net = incoming - reflected - outgoing  # → (N_φ, N_ϑ)
+# F_in: F̄ = 340, a = 100, b = 0
+incoming = flux(340.0, 100.0, 0.0)                                   # → (N_φ, N_ϑ)
+# F_refl: F̄ = 100, a = 30, b = 5
+reflected = flux(100.0, 30.0, 5.0)                                   # → (N_φ, N_ϑ)
+# F_out: F̄ = 239.3, a = 40, b = 8
+outgoing = flux(239.3, 40.0, 8.0)                                    # → (N_φ, N_ϑ)
+# F_in − F_refl
+absorbed = incoming - reflected                                      # → (N_φ, N_ϑ)
+# F_net = F_in − F_refl − F_out
+net = absorbed - outgoing                                            # → (N_φ, N_ϑ)
 # today (integrix)
 # F̄_net = ∑ⱼₖ wⱼₖ F_net(φⱼ, ϑₖ), in float64
-reference = float(rule.integrate(area, net, axis=(0, 1)).value)
+integral = rule.integrate(area, net, axis=(0, 1))
+reference = float(integral.value)                                    # → ()
 
 
-def single(x):
+# user
+def single(x: Float[Array, "*dims"]) -> Float[Array, "*dims"]:
     """The same array in float32."""
-    # user
-    return x.astype(jnp.float32)
+    # x₃₂ = round to float32 (x)
+    cast = x.astype(jnp.float32)                                     # (*dims) → (*dims)
+    return cast
 
 
-area32 = single(area)
-net32 = single(incoming) - single(reflected) - single(outgoing)
+# w₃₂ = round to float32 (w)
+area32 = single(area)                                                # → (N_φ, N_ϑ)
+# F_in,₃₂, F_refl,₃₂, F_out,₃₂
+incoming32 = single(incoming)                                        # → (N_φ, N_ϑ)
+reflected32 = single(reflected)                                      # → (N_φ, N_ϑ)
+outgoing32 = single(outgoing)                                        # → (N_φ, N_ϑ)
+# F_in,₃₂ − F_refl,₃₂
+absorbed32 = incoming32 - reflected32                                # → (N_φ, N_ϑ)
+# F_net,₃₂ = F_in,₃₂ − F_refl,₃₂ − F_out,₃₂
+net32 = absorbed32 - outgoing32                                      # → (N_φ, N_ϑ)
 # today (integrix)
 # integrate the net field: cancel first, then sum
-direct = rule.integrate(area32, net32, axis=(0, 1)).value
-# today (integrix)
+direct = rule.integrate(area32, net32, axis=(0, 1)).value            # → ()
 # integrate each flux, then subtract: sum first, then cancel
-means = [
-    rule.integrate(area32, single(f), axis=(0, 1)).value
-    for f in (incoming, reflected, outgoing)
-]
-separate = means[0] - means[1] - means[2]
+means = []
+for flux_field in (incoming, reflected, outgoing):
+    # w₃₂-weighted sum of one flux
+    flux32 = single(flux_field)                                      # → (N_φ, N_ϑ)
+    # today (integrix)
+    # F̄ᵢ = ∑ⱼₖ wⱼₖ Fᵢ,₃₂(φⱼ, ϑₖ)
+    mean = rule.integrate(area32, flux32, axis=(0, 1)).value         # → ()
+    means.append(mean)
+# F̄_in − F̄_refl
+reduced = means[0] - means[1]                                        # → ()
+# F̄_sep = F̄_in − F̄_refl − F̄_out
+separate = reduced - means[2]                                        # → ()
 print(
     f"net flux (float64):         {reference:.4f} W/m2, dtype of direct {direct.dtype}"
 )
 print(f"float32, net field:         error {abs(float(direct) - reference):.1e} W/m2")
 print(f"float32, fluxes separately: error {abs(float(separate) - reference):.1e} W/m2")
-kappa_net = float(jnp.sum(area * jnp.abs(net))) / abs(reference)
-kappa_separate = float(jnp.sum(area * incoming)) / abs(reference)
+# |F_net|
+abs_net = jnp.abs(net)                                               # → (N_φ, N_ϑ)
+# wⱼₖ |F_net,ⱼₖ|
+weighted_net = area * abs_net                                        # → (N_φ, N_ϑ)
+# κ_net = ∑ⱼₖ wⱼₖ |F_net,ⱼₖ| / |F̄_net|
+kappa_net = float(jnp.sum(weighted_net)) / abs(reference)            # → ()
+# wⱼₖ F_in,ⱼₖ
+weighted_in = area * incoming                                        # → (N_φ, N_ϑ)
+# κ_sep = ∑ⱼₖ wⱼₖ F_in,ⱼₖ / |F̄_net|
+kappa_separate = float(jnp.sum(weighted_in)) / abs(reference)        # → ()
 print(f"condition number: net field {kappa_net:.0f}, largest flux {kappa_separate:.0f}")
 ```
 
@@ -111,13 +175,17 @@ The last place precision bites is inside the rules, at the edges of the domain, 
 - **Tanh–sinh near a singular end.** The double-exponential map of chapter 8 sends nodes extremely close to the endpoints, and $a + (b - a)(1 + \tanh u)/2$ rounds onto $a$ in float32 long before the weights become negligible. [`TanhSinh`](xref:api#integrix.adapt.TanhSinh) forms the distance to the nearer end directly, as $(b - a)/(1 + e^{2 \vert u \vert})$, and gives zero weight to any node that still lands on the end, so an integrand like $s^{-1/2}$ is never evaluated at its singularity.
 
 ```python
+# Shapes: scalars only (one integral on [0, 1])
+
 # today (integrix)
 # ∫₀¹ s^(−1/2) ds = 2, in float32
-singular = adapt.TanhSinh()(
+singular = adapt.TanhSinh()(              # → ()
     lambda s: 1.0 / jnp.sqrt(s), jnp.float32(0.0), jnp.float32(1.0)
 )
+# ε = |Î − 2|
+error = abs(float(singular.value) - 2.0)  # → ()
 print(
-    f"tanh-sinh in {singular.value.dtype}: error {abs(float(singular.value) - 2.0):.1e}, "
+    f"tanh-sinh in {singular.value.dtype}: error {error:.1e}, "
     f"converged {bool(singular.converged)}"
 )
 ```

@@ -34,22 +34,31 @@ import jax.numpy as jnp
 import jax.scipy.stats as stats
 import numpy as np
 from integrix import expect, rule
+from jaxtyping import Array, Float, PRNGKeyArray
 
 # Shapes: N_E draws of a scalar emission rate
 key = jax.random.key(0)
+# μ = log 500, σ = 0.3
 log_mean, log_std = np.log(500.0), 0.3
 
 
-def posterior_draws(key, n):
+# user
+def posterior_draws(
+    key: PRNGKeyArray,
+    n: int,
+) -> Float[Array, "draw"]:
     """Q⁽ᵉ⁾ = exp(log 500 + 0.3 ε⁽ᵉ⁾), ε⁽ᵉ⁾ ~ 𝒩(0, 1)."""
-    # user
-    return jnp.exp(log_mean + log_std * jax.random.normal(key, (n,)))
+    # εₑ ~ 𝒩(0, 1)
+    noise = jax.random.normal(key, (n,))                                # → (N_E,)
+    # Qₑ = exp(μ + σ εₑ)
+    return jnp.exp(log_mean + log_std * noise)
 
 
 # today (integrix)
 # Î = (1/N_E) ∑ₑ Q⁽ᵉ⁾, σ̂ = s/√N_E
-rate = expect.monte_carlo(lambda q: q, posterior_draws, 1000, key=key)
-exact_rate = 500.0 * np.exp(log_std**2 / 2.0)
+rate = expect.monte_carlo(lambda q: q, posterior_draws, 1000, key=key)  # → ()
+# 𝔼[Q] = exp(μ + σ²/2)
+exact_rate = 500.0 * np.exp(log_std**2 / 2.0)                           # → ()
 print(
     f"E[Q] = {float(rate.value):.1f} +/- {float(rate.standard_error):.1f} kg/h "
     f"(exact {exact_rate:.1f})"
@@ -73,36 +82,58 @@ Random nodes are clumpy: some regions of the box get more points than they shoul
 We compare the two on a smooth product in $D = 8$, $f(\vect{u}) = \prod_{d=1}^{8} (1 + \frac{1}{2} (u_d - \frac{1}{2}))$ over the unit cube, whose exact mean is 1, and fit the slope of the standard error against the number of evaluations.
 
 ```python
-# Shapes: D = 8; N_E = 16 shifts × n points
+# Shapes: D = 8 dimensions; N_E = 16 shifts × n points
 dimension = 8
+# one independent key per estimator
 mc_key, qmc_key = jax.random.split(key)
 
 
-def smooth_product(point):
+# user
+def smooth_product(
+    point: Float[Array, "dim"],
+) -> Float[Array, ""]:
     """f(u) = ∏_d (1 + (u_d − ½)/2), with 𝔼[f] = 1 on [0, 1)⁸."""
-    # user
-    return jnp.prod(1.0 + 0.5 * (point - 0.5))
+    # u_d − ½
+    centred = point - 0.5                                              # → (D,)
+    # t_d = 1 + (u_d − ½)/2
+    factors = 1.0 + 0.5 * centred                                      # → (D,)
+    # f = ∏_d t_d
+    return jnp.prod(factors)
 
 
-def uniform_draws(key, n):
+# user
+def uniform_draws(
+    key: PRNGKeyArray,
+    n: int,
+) -> Float[Array, "draw dim"]:
     """N_E points uniform on [0, 1)⁸."""
-    # user
-    return jax.random.uniform(key, (n, dimension))
+    # uₑ ~ 𝒰[0, 1)ᴰ
+    points = jax.random.uniform(key, (n, dimension))                   # → (N_E, D)
+    return points
 
 
 evaluations, mc_errors, qmc_errors = [], [], []
 for n_points in (256, 1024, 4096, 16384):
-    n_total = 16 * n_points
+    # N_E = 16 n
+    n_total = 16 * n_points                                            # → ()
     # today (integrix)
-    plain = expect.monte_carlo(smooth_product, uniform_draws, n_total, key=mc_key)
+    # Î = (1/N_E) ∑ₑ f(uₑ), σ̂ = s/√N_E
+    plain = expect.monte_carlo(                                        # → ()
+        smooth_product, uniform_draws, n_total, key=mc_key
+    )
     # today (integrix)
-    shifted = expect.qmc(smooth_product, dimension, n_points, n_shifts=16, key=qmc_key)
+    # Î = (1/16) ∑ₛ (1/n) ∑ᵢ f(uᵢ ⊕ Δₛ), σ̂ from the 16 shifts
+    shifted = expect.qmc(                                              # → ()
+        smooth_product, dimension, n_points, n_shifts=16, key=qmc_key
+    )
     evaluations.append(n_total)
     mc_errors.append(float(plain.standard_error))
     qmc_errors.append(float(shifted.standard_error))
     print(f"N_E = {n_total:6d}: MC {mc_errors[-1]:.1e}, QMC {qmc_errors[-1]:.1e}")
-mc_slope = np.polyfit(np.log(evaluations), np.log(mc_errors), 1)[0]
-qmc_slope = np.polyfit(np.log(evaluations), np.log(qmc_errors), 1)[0]
+# log σ̂ = slope · log N_E + c, fitted for MC
+mc_slope = np.polyfit(np.log(evaluations), np.log(mc_errors), 1)[0]    # → ()
+# log σ̂ = slope · log N_E + c, fitted for QMC
+qmc_slope = np.polyfit(np.log(evaluations), np.log(qmc_errors), 1)[0]  # → ()
 print(f"slope: MC {mc_slope:.2f}, QMC {qmc_slope:.2f}")
 ```
 
@@ -127,44 +158,77 @@ with $\vect{x}^{(e)} \sim q$, $\tilde{p}$ the unnormalised target, and $N_\text{
 We update a log-normal prior on the emission rate, $\log Q \sim \mathcal{N}(\log 400, 0.5^2)$, with one mass-balance estimate of 520 kg h⁻¹ and a 10 % error, using the prior as the proposal. The reference is the same expectation on a fine grid with [`integrate`](xref:api#integrix.rule.integrate), since this toy posterior is one-dimensional.
 
 ```python
-# Shapes: N_E = 4000 draws of x = log Q
+# Shapes: N_E = 4000 draws of x = log Q; N = 20,001 grid nodes; *B any batch shape
+# μ_q = log 400, σ_q = 0.5
 prior_mean, prior_std = np.log(400.0), 0.5
 
 
-def prior_log_density(log_rate):
+# user
+def prior_log_density(
+    log_rate: Float[Array, "*batch"],
+) -> Float[Array, "*batch"]:
     """log q(x) = log 𝒩(x; log 400, 0.5²)."""
-    # user
-    return stats.norm.logpdf(log_rate, prior_mean, prior_std)
+    # log q(x) = log 𝒩(x; μ_q, σ_q²)
+    log_q = stats.norm.logpdf(log_rate, prior_mean, prior_std)       # → (*B,)
+    return log_q
 
 
-def target_log_density(log_rate):
+# user
+def target_log_density(
+    log_rate: Float[Array, "*batch"],
+) -> Float[Array, "*batch"]:
     """log p̃(x) = log q(x) + log 𝒩(eˣ; 520, 52²)."""
-    # user
-    return prior_log_density(log_rate) + stats.norm.logpdf(
-        jnp.exp(log_rate), 520.0, 52.0
-    )
+    # log q(x)
+    log_q = prior_log_density(log_rate)                              # → (*B,)
+    # Q = eˣ
+    rate = jnp.exp(log_rate)                                         # → (*B,)
+    # log 𝒩(Q; 520, 52²)
+    log_like = stats.norm.logpdf(rate, 520.0, 52.0)                  # → (*B,)
+    # log p̃(x) = log q(x) + log 𝒩(eˣ; 520, 52²)
+    return log_q + log_like
 
 
-def prior_draws(key, n):
+# user
+def prior_draws(
+    key: PRNGKeyArray,
+    n: int,
+) -> Float[Array, "draw"]:
     """x⁽ᵉ⁾ ~ 𝒩(log 400, 0.5²)."""
-    # user
-    return prior_mean + prior_std * jax.random.normal(key, (n,))
+    # εₑ ~ 𝒩(0, 1)
+    noise = jax.random.normal(key, (n,))                             # → (N_E,)
+    # xₑ = μ_q + σ_q εₑ
+    return prior_mean + prior_std * noise
 
 
 # today (integrix)
 # Î = ∑ₑ w⁽ᵉ⁾ eˣ⁽ᵉ⁾ / ∑ₑ w⁽ᵉ⁾, w⁽ᵉ⁾ = p̃/q
-posterior_rate = expect.importance(
+posterior_rate = expect.importance(                                  # → ()
     jnp.exp, prior_draws, prior_log_density, target_log_density, 4000, key=key
 )
 # reference: the same ratio of integrals on a fine grid in x
-grid = jnp.linspace(prior_mean - 8 * prior_std, prior_mean + 8 * prior_std, 20001)
-spacing = grid[1] - grid[0]
-grid_weights = jnp.full(20001, spacing).at[jnp.array([0, -1])].set(spacing / 2)
-log_target = target_log_density(grid)
-density = jnp.exp(log_target - jnp.max(log_target))
+# x_min = μ_q − 8σ_q
+lower = prior_mean - 8 * prior_std                                   # → ()
+# x_max = μ_q + 8σ_q
+upper = prior_mean + 8 * prior_std                                   # → ()
+# xᵢ evenly spaced from x_min to x_max
+grid = jnp.linspace(lower, upper, 20001)                             # → (N,)
+# Δx = x₁ − x₀
+spacing = grid[1] - grid[0]                                          # → ()
+# indices of the two end nodes, which get half weight
+ends = jnp.array([0, -1])
+# wᵢ = Δx, with Δx/2 at both ends (trapezoid)
+grid_weights = jnp.full(20001, spacing).at[ends].set(spacing / 2)    # → (N,)
+# log p̃(xᵢ)
+log_target = target_log_density(grid)                                # → (N,)
+# m = maxᵢ log p̃(xᵢ)
+peak = jnp.max(log_target)                                           # → ()
+# p̃ᵢ ∝ exp(log p̃(xᵢ) − m)
+density = jnp.exp(log_target - peak)                                 # → (N,)
+# Qᵢ = exp(xᵢ)
+rates = jnp.exp(grid)                                                # → (N,)
 # today (integrix)
 # 𝔼[Q] = ∫ eˣ p̃(x) dx / ∫ p̃(x) dx
-reference = rule.weighted_mean(grid_weights, jnp.exp(grid), weight=density)
+reference = rule.weighted_mean(grid_weights, rates, weight=density)  # → ()
 print(
     f"E[Q | y] = {float(posterior_rate.value):.1f} "
     f"+/- {float(posterior_rate.standard_error):.1f} kg/h "

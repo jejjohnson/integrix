@@ -44,32 +44,46 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from integrix import rule, scan
+from jaxtyping import Array, Float
 
 # Shapes: N = 41 levels
 
 
+# user
 class Rule(eqx.Module):
     """Nodes and weights: a stand-in for functax's rules (functax#44)."""
 
-    # user
-    nodes: jax.Array
-    weights: jax.Array
+    nodes: Float[Array, "node"]
+    weights: Float[Array, "node"]
 
 
 # zₙ, km, from the surface to the top
-height = jnp.linspace(0.0, 80.0, 41)  # → (N,)
-spacing = height[1] - height[0]
-weights = jnp.full(41, spacing).at[jnp.array([0, -1])].set(spacing / 2)
+height = jnp.linspace(0.0, 80.0, 41)                            # → (N,)
+# Δz = z₂ − z₁
+spacing = height[1] - height[0]                                 # → ()
+# Δz/2, the trapezoid weight at the ends
+half_spacing = spacing / 2                                      # → ()
+# the surface and top levels
+ends = jnp.array([0, -1])
+# wₙ = Δz, with Δz/2 at the ends
+weights = jnp.full(41, spacing).at[ends].set(half_spacing)      # → (N,)
 levels = Rule(height, weights)
-# β(z) = β₀ exp(−z/H_β), km⁻¹
-absorption = 0.125 * jnp.exp(-height / 8.0)  # → (N,)
-# τ(z) = β₀ H_β (exp(−z/H_β) − exp(−z_top/H_β))
-exact = 0.125 * 8.0 * (jnp.exp(-height / 8.0) - jnp.exp(-80.0 / 8.0))  # → (N,)
+# s = z/H_β
+scaled_height = height / 8.0                                    # → (N,)
+# β(z) = β₀ exp(−s), km⁻¹
+absorption = 0.125 * jnp.exp(-scaled_height)                    # → (N,)
+# e_s = exp(−s)
+surface_term = jnp.exp(-scaled_height)                          # → (N,)
+# e_t = exp(−z_top/H_β)
+top_term = jnp.exp(-80.0 / 8.0)                                 # → ()
+# τ(z) = β₀ H_β (e_s − e_t)
+exact = 0.125 * 8.0 * (surface_term - top_term)                 # → (N,)
 
 # today (integrix)
 # τₖ = τₖ₊₁ + Δₖ₊₁, from the top down
 optical_depth = scan.cumulative(levels, absorption, reverse=True)  # → (N,)
 for level in (40, 20, 10, 5, 0):
+    # e = τ̂ − τ
     error = float(optical_depth[level] - exact[level])
     print(
         f"z = {float(height[level]):4.0f} km: tau = {float(optical_depth[level]):.4f}"
@@ -90,12 +104,13 @@ surface transmittance: 0.3660
 The top level has zero optical depth by construction, and the error grows downwards as the interval errors add up, reaching $5.2 \times 10^{-3}$ at the surface. That is the leading term of [](#eq-euler-maclaurin), $\frac{h^2}{12} (\beta'(z_\text{top}) - \beta'(0)) \approx \frac{h^2}{12} \frac{\beta_0}{H_\beta}$ with $h = 2$ km, so the error is the $O(h^2)$ of the trapezoid rule and nothing else. The forward scan of the same samples, the reversed one and a plain rule all agree on the total, since they sum the same increments.
 
 ```python
+# Shapes: N = 41 levels
 # today (integrix)
 # Fₖ = Fₖ₋₁ + Δₖ, from the surface up
-upward = scan.cumulative(levels, absorption)  # → (N,)
+upward = scan.cumulative(levels, absorption)                    # → (N,)
 # today (integrix)
 # I = ∑ₙ wₙ β(zₙ)
-total = rule.integrate(levels, absorption).value  # → ()
+total = rule.integrate(levels, absorption).value                # → ()
 print(f"forward, last:  {float(upward[-1]):.12f}")
 print(f"reverse, first: {float(optical_depth[0]):.12f}")
 print(f"rule:           {float(total):.12f}")

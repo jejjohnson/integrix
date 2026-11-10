@@ -58,24 +58,36 @@ jax.config.update("jax_enable_x64", True)
 import einx
 import jax.numpy as jnp
 import lineax as lx
+from jaxtyping import Array, Float
 
 # Shapes: N nodes on [0, 1]
 
 
-def newton_cotes_weights(n_nodes):
+# user
+def newton_cotes_weights(
+    n_nodes: int,
+) -> tuple[Float[Array, "node"], Float[Array, "node"]]:
     """Solve the moment equations V w = b for N equally spaced nodes."""
-    # user
-    nodes = jnp.linspace(0.0, 1.0, n_nodes)  # → (N,)
-    # [V]ₘₙ = sₙᵐ
-    vandermonde = jnp.vander(nodes, increasing=True)  # (N,) → (N, N)
+    # sₙ = (n − 1)/(N − 1)
+    nodes = jnp.linspace(0.0, 1.0, n_nodes)             # → (N,)
+    # Aₙₘ = sₙᵐ
+    vandermonde = jnp.vander(nodes, increasing=True)    # (N,) → (N, N)
+    # Vₘₙ = Aₙₘ
     moment_matrix = einx.id("n m -> m n", vandermonde)  # (N, N) → (N, N)
+    # m + 1 for m = 0, …, N − 1
+    exponents = jnp.arange(1.0, n_nodes + 1.0)          # → (N,)
     # bₘ = ∫₀¹ sᵐ ds = 1/(m + 1)
-    moments = 1.0 / jnp.arange(1.0, n_nodes + 1.0)  # → (N,)
+    moments = 1.0 / exponents                           # (N,) → (N,)
+    # today (lineax)
+    # V as a linear operator
+    operator = lx.MatrixLinearOperator(moment_matrix)   # (N, N) → (N, N) op
+    # today (lineax)
     # w = V⁻¹ b, by a solve
-    operator = lx.MatrixLinearOperator(moment_matrix)
-    return nodes, lx.linear_solve(operator, moments).value  # → (N,)
+    solution = lx.linear_solve(operator, moments)       # (N,) → (N,)
+    return nodes, solution.value
 
 
+# the Simpson and Newton–Cotes weights, from the solves
 simpson_nodes, simpson = newton_cotes_weights(3)
 print("N = 3: ", jnp.round(simpson * 6.0, 10).tolist(), "/ 6")
 eleven_nodes, eleven = newton_cotes_weights(11)
@@ -96,11 +108,18 @@ A rule has degree of exactness $m^\star$ when it integrates every polynomial of 
 ```python
 from integrix import rule
 
+# Shapes: N = 3 nodes of Simpson's rule
+
 for degree in (2, 3, 4):
+    # fₙ = sₙᵐ
+    powers = simpson_nodes**degree                    # (N,) → (N,)
     # today (integrix)
-    # Î = ∑ₙ wₙ sₙᵐ against ∫₀¹ sᵐ ds = 1/(m + 1)
-    estimate = rule.integrate(simpson, simpson_nodes**degree).value
-    error = float(estimate) - 1.0 / (degree + 1)
+    # Î = ∑ₙ wₙ sₙᵐ
+    estimate = rule.integrate(simpson, powers).value  # → ()
+    # I = ∫₀¹ sᵐ ds = 1/(m + 1)
+    exact = 1.0 / (degree + 1)                        # → ()
+    # E = Î − I
+    error = float(estimate) - exact                   # → ()
     # round-off below 10⁻¹² counts as exact
     verdict = "exact" if abs(error) < 1e-12 else f"error = {error:.2e}"
     print(f"m = {degree}: {verdict}")

@@ -24,29 +24,45 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
+from typing import Any, Callable
+
 import diffrax as dfx
 import jax.numpy as jnp
 from integrix import adapt, adjoint, march, rule
+from jaxtyping import Array, Float
 
 # Shapes: N_P = 6 pressure levels
 
-pressure = jnp.linspace(0.0, 1013.0, 6)  # → (N_P,)
-widths = jnp.diff(pressure)
-zero = jnp.zeros(1)
-# trapezoid weights, wₙ = (pₙ₊₁ − pₙ₋₁)/2
-weights = 0.5 * (jnp.concatenate([widths, zero]) + jnp.concatenate([zero, widths]))
-methane = 1600.0 + 300.0 * pressure / 1013.0  # → (N_P,)
+# pₙ = 1013 n / 5
+pressure = jnp.linspace(0.0, 1013.0, 6)             # → (N_P,)
+# Δₙ = pₙ₊₁ − pₙ
+widths = jnp.diff(pressure)                         # → (N_P − 1,)
+# zero-padding so both shifted copies of Δ line up with the N_P nodes
+zero = jnp.zeros(1)                                 # → (1,)
+# Δₙ⁺ = Δₙ, with Δ_{N_P}⁺ = 0
+above = jnp.concatenate([widths, zero])             # → (N_P,)
+# Δₙ⁻ = Δₙ₋₁, with Δ₀⁻ = 0
+below = jnp.concatenate([zero, widths])             # → (N_P,)
+# wₙ = (Δₙ⁺ + Δₙ⁻)/2 = (pₙ₊₁ − pₙ₋₁)/2
+weights = 0.5 * (above + below)                     # → (N_P,)
+# cₙ = 1600 + 300 pₙ / 1013
+methane = 1600.0 + 300.0 * pressure / 1013.0        # → (N_P,)
 
 
-def column_average(profile):
+# user
+def column_average(
+    profile: Float[Array, "level"],
+) -> Float[Array, ""]:
     """XCH₄ = (1/p_s) ∑ₙ wₙ c(pₙ)."""
-    # user
     # today (integrix)
-    return rule.integrate(weights, profile).value / pressure[-1]
+    # I = ∑ₙ wₙ cₙ
+    total = rule.integrate(weights, profile).value  # → ()
+    # XCH₄ = I / p_s
+    return total / pressure[-1]
 
 
 # ∂XCH₄/∂cₙ = wₙ / p_s = hₙ
-sensitivity = jax.grad(column_average)(methane)  # → (N_P,)
+sensitivity = jax.grad(column_average)(methane)     # → (N_P,)
 print("dXCH4/dc =", " ".join(f"{value:.3f}" for value in sensitivity))
 print("h        =", " ".join(f"{value:.3f}" for value in weights / pressure[-1]))
 ```
@@ -59,9 +75,14 @@ h        = 0.100 0.200 0.200 0.200 0.200 0.100
 The limits of an integral have an adjoint too. The Leibniz rule gives $\frac{\mathrm{d}}{\mathrm{d}b} \int_a^b f(s) \mathrm{d}s = f(b)$ and $\frac{\mathrm{d}}{\mathrm{d}a} \int_a^b f(s) \mathrm{d}s = -f(a)$, and an adaptive rule differentiates its final rule on its final partition (chapter 8), which includes the limits.
 
 ```python
+# Shapes: scalars only (the upper limit b)
+
 # today (integrix)
-# d/db ∫₀ᵇ eˢ ds = eᵇ
-upper_derivative = jax.grad(lambda b: adapt.GaussKronrod()(jnp.exp, 0.0, b).value)(1.5)
+# I(b) = ∫₀ᵇ eˢ ds, by adaptive Gauss–Kronrod
+integrate = adapt.GaussKronrod()
+# today (integrix)
+# dI/db = eᵇ
+upper_derivative = jax.grad(lambda b: integrate(jnp.exp, 0.0, b).value)(1.5)  # → ()
 print(f"d/db = {float(upper_derivative):.12f}, exp(b) = {float(jnp.exp(1.5)):.12f}")
 ```
 
@@ -96,32 +117,51 @@ import math
 
 from jax._src.ad_checkpoint import saved_residuals
 
-# Shapes: D_x = 8; K = 400 steps
-n_steps = 400
-initial = jnp.ones(8)  # → (D_x,)
+# Shapes: D_x = 8; K = 400 steps; B = steps per checkpointed segment
+n_steps = 400  # K
+# x₀ = 1
+initial = jnp.ones(8)                                            # → (D_x,)
 
 
-def step(state, _):
+# user
+def step(
+    state: Float[Array, "state"], _: None
+) -> tuple[Float[Array, "state"], None]:
     """xₖ₊₁ = 1.01 sin(xₖ)."""
-    # user
-    return jnp.sin(state) * 1.01, None
+    # sₖ = sin(xₖ)
+    sine = jnp.sin(state)                                        # → (D_x,)
+    # xₖ₊₁ = 1.01 sₖ
+    advanced = sine * 1.01                                       # → (D_x,)
+    return advanced, None
 
 
-def stored_states(scan_fn):
+# user
+def stored_states(
+    scan_fn: Callable[..., Any],
+) -> int:
     """The number of D_x-sized states reverse mode keeps from the forward pass."""
 
     # user
-    def final_sum(state):
-        return jnp.sum(scan_fn(step, state, None)[0])
+    def final_sum(
+        state: Float[Array, "state"],
+    ) -> Float[Array, ""]:
+        # x_K = scan(step)(x₀)
+        final, _ = scan_fn(step, state, None)                    # → (D_x,)
+        # s = ∑ᵢ x_K,ᵢ
+        return jnp.sum(final)
 
     residuals = saved_residuals(final_sum, initial)
-    return sum(math.prod(aval.shape) for aval, _ in residuals) // initial.size
+    # n = ∑ᵣ size(rᵣ) / D_x
+    total = sum(math.prod(aval.shape) for aval, _ in residuals)  # → ()
+    return total // initial.size
 
 
+# n = K: plain reverse mode stores every state
 plain = stored_states(lambda f, c, x: jax.lax.scan(f, c, x, length=n_steps))
 print(f"plain reverse mode: {plain} stored")
 for every in (5, 10, 20, 40, 80):
     # today (integrix)
+    # n = K / B stored states, plus B recomputed within a segment
     stored = stored_states(
         lambda f, c, x: adjoint.checkpointed_scan(f, c, x, every=every, length=n_steps)
     )
@@ -147,29 +187,42 @@ Now the whole thing on a toy 4D-Var problem. A surface current with velocity $(u
 
 ```python
 # Shapes: D_x = 2 (u, v); K = 400 half-hour steps
+# f_cor = 0.36, r = 0.01, per hour
 coriolis, damping = 0.36, 0.01
 
 
-def tendency(t, state, args):
+# user
+def tendency(
+    t: float, state: Float[Array, "state"], args: Any
+) -> Float[Array, "state"]:
     """u̇ = f_cor v − r u, v̇ = −f_cor u − r v, per hour."""
-    # user
     u, v = state[0], state[1]
-    return jnp.stack([coriolis * v - damping * u, -coriolis * u - damping * v])
+    # u̇ = f_cor v − r u
+    du = coriolis * v - damping * u                   # → ()
+    # v̇ = −f_cor u − r v
+    dv = -coriolis * u - damping * v                  # → ()
+    # ẋ = (u̇, v̇)
+    return jnp.stack([du, dv])
 
 
 every_step = dfx.SaveAt(steps=True)
 # today (integrix)
-truth = march.run(
+# xₖ₊₁ = xₖ + Δt (3 ẋₖ − ẋₖ₋₁)/2, Δt = ½ h
+truth = march.run(                                    # → (K, D_x)
     march.AB2Solver(), tendency, 0.0, jnp.array([0.2, 0.0]), 0.5, 400, saveat=every_step
 )
-observations = truth[:, 0]  # (K, D_x) → (K,)
+# yₖ = uₖ
+observations = truth[:, 0]                            # (K, D_x) → (K,)
 
 
-def misfit(initial_state, adjoint_option):
+# user
+def misfit(
+    initial_state: Float[Array, "state"], adjoint_option: Any
+) -> Float[Array, ""]:
     """𝒥(x₀) = ½ ∑ₖ (uₖ − yₖ)²."""
-    # user
     # today (integrix)
-    trajectory = march.run(
+    # xₖ₊₁ = xₖ + Δt (3 ẋₖ − ẋₖ₋₁)/2, from x₀
+    trajectory = march.run(                           # → (K, D_x)
         march.AB2Solver(),
         tendency,
         0.0,
@@ -179,17 +232,24 @@ def misfit(initial_state, adjoint_option):
         saveat=every_step,
         adjoint=adjoint_option,
     )
-    return 0.5 * jnp.sum((trajectory[:, 0] - observations) ** 2)
+    # rₖ = uₖ − yₖ
+    residual = trajectory[:, 0] - observations        # → (K,)
+    # 𝒥 = ½ ∑ₖ rₖ²
+    return 0.5 * jnp.sum(residual**2)
 
 
-first_guess = jnp.array([0.1, 0.05])
+# x₀ first guess, away from the truth (0.2, 0)
+first_guess = jnp.array([0.1, 0.05])                  # → (D_x,)
 options = {
     "plain": None,
+    # today (integrix)
     "Checkpointed(every=20)": adjoint.Checkpointed(every=20),
+    # today (integrix)
     "Truncated(k=20)": adjoint.Truncated(k=20),
 }
 for name, option in options.items():
-    gradient = jax.grad(misfit)(first_guess, option)
+    # ∇ₓ₀𝒥
+    gradient = jax.grad(misfit)(first_guess, option)  # → (D_x,)
     print(f"{name:23s} grad = ({float(gradient[0]):+.6f}, {float(gradient[1]):+.6f})")
 ```
 

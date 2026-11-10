@@ -43,7 +43,9 @@ def run_blocks(codes: list[str]) -> list[str]:
     for code in codes:
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            exec(compile(code, "<theory>", "exec"), namespace)
+            # dont_inherit: this module's `from __future__ import annotations` must
+            # not turn a page's annotations into strings (eqx.Module fields need them)
+            exec(compile(code, "<theory>", "exec", dont_inherit=True), namespace)
         printed.append(buffer.getvalue())
     return printed
 

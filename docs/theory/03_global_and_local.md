@@ -54,17 +54,28 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 from integrix import rule
+from jaxtyping import Array, Float
 from scipy.special import i0
 
-# Shapes: N nodes on a circle of longitude
-exact_circle = 2.0 * np.pi * i0(1.0)
+# Shapes: N = 2, 4, 8, 16 nodes on a circle of longitude
+# I = ∫₀²π exp(cos ϑ) dϑ = 2π I₀(1)
+exact_circle = 2.0 * np.pi * i0(1.0)                   # → ()
 for n_nodes in (2, 4, 8, 16):
-    # ϑₙ = 2π n / N, wₙ = 2π / N
-    longitude = 2.0 * jnp.pi * jnp.arange(n_nodes) / n_nodes  # → (N,)
-    weights = jnp.full(n_nodes, 2.0 * jnp.pi / n_nodes)  # → (N,)
+    # n = 0, …, N − 1
+    index = jnp.arange(n_nodes)                        # → (N,)
+    # ϑₙ = 2π n / N
+    longitude = 2.0 * jnp.pi * index / n_nodes         # (N,) → (N,)
+    # wₙ = 2π / N
+    spacing = 2.0 * jnp.pi / n_nodes                   # → ()
+    # wₙ = 2π / N, repeated
+    weights = jnp.full(n_nodes, spacing)               # → (N,)
+    # cₙ = cos ϑₙ
+    cosine = jnp.cos(longitude)                        # (N,) → (N,)
+    # fₙ = exp(cₙ)
+    samples = jnp.exp(cosine)                          # (N,) → (N,)
     # today (integrix)
     # Î = ∑ₙ wₙ exp(cos ϑₙ)
-    estimate = rule.integrate(weights, jnp.exp(jnp.cos(longitude))).value
+    estimate = rule.integrate(weights, samples).value  # → ()
     print(f"N = {n_nodes:2d}: error = {abs(float(estimate) - exact_circle):.1e}")
 ```
 
@@ -87,34 +98,53 @@ from scipy.special import erf
 # Shapes: N nodes in μ = sin φ ∈ [−1, 1]
 
 
-def band(mu):
+# user
+def band(mu: Float[Array, "node"]) -> Float[Array, "node"]:
     """f_band(μ) = exp(−μ²/(2 · 0.3²))."""
-    # user
-    return jnp.exp(-(mu**2) / (2.0 * 0.3**2))
+    # μₙ²
+    square = mu**2                                                          # → (N,)
+    # f_band(μₙ) = exp(−μₙ²/(2 · 0.3²))
+    return jnp.exp(-square / (2.0 * 0.3**2))
 
 
-def ice(mu):
+# user
+def ice(mu: Float[Array, "node"]) -> Float[Array, "node"]:
     """f_ice(μ) = max(0, |μ| − 0.8)."""
-    # user
-    return jnp.maximum(0.0, jnp.abs(mu) - 0.8)
+    # δₙ = |μₙ| − 0.8
+    excess = jnp.abs(mu) - 0.8                                              # → (N,)
+    # f_ice(μₙ) = max(0, δₙ)
+    return jnp.maximum(0.0, excess)
 
 
-def trapezoid(n_nodes):
+# user
+def trapezoid(
+    n_nodes: int,
+) -> tuple[Float[Array, "node"], Float[Array, "node"]]:
     """Equally spaced nodes on [−1, 1], with h/2 at each end."""
-    # user
-    nodes = jnp.linspace(-1.0, 1.0, n_nodes)  # → (N,)
-    spacing = nodes[1] - nodes[0]
-    weights = jnp.full(n_nodes, spacing).at[jnp.array([0, -1])].set(spacing / 2)
+    # μₙ = −1 + 2(n − 1)/(N − 1)
+    nodes = jnp.linspace(-1.0, 1.0, n_nodes)                                # → (N,)
+    # h = μ₂ − μ₁
+    spacing = nodes[1] - nodes[0]                                           # → ()
+    # the two end nodes, which have half a tile
+    ends = jnp.array([0, -1])                                               # → (2,)
+    # wₙ = h
+    interior = jnp.full(n_nodes, spacing)                                   # → (N,)
+    # wₙ = h/2 at both ends
+    weights = interior.at[ends].set(spacing / 2)                            # → (N,)
     return nodes, weights
 
 
+# a = 1/(0.3 √2)
+erf_argument = 1.0 / (0.3 * np.sqrt(2.0))                                   # → ()
+# I_band = 0.3 √(2π) erf(a), and I_ice = 0.04 from the two triangles
 exact = {
-    "band": 0.3 * np.sqrt(2.0 * np.pi) * erf(1.0 / (0.3 * np.sqrt(2.0))),
+    "band": 0.3 * np.sqrt(2.0 * np.pi) * erf(erf_argument),
     "ice": 0.04,
 }
 labels = ("GL band", "TR band", "GL ice", "TR ice")
 print(" N  " + "  ".join(f"{label:>8}" for label in labels))
 for n_nodes in (4, 8, 16, 32, 64):
+    # the Gauss–Legendre nodes and weights, and the trapezoid ones
     gauss_nodes, gauss_weights = np.polynomial.legendre.leggauss(n_nodes)
     trap_nodes, trap_weights = trapezoid(n_nodes)
     errors = []
@@ -123,10 +153,14 @@ for n_nodes in (4, 8, 16, 32, 64):
             (gauss_nodes, gauss_weights),
             (trap_nodes, trap_weights),
         ):
+            # fₙ = f(μₙ)
+            samples = field(nodes)                                          # → (N,)
             # today (integrix)
             # Î = ∑ₙ wₙ f(μₙ)
-            estimate = rule.integrate(jnp.asarray(weights), field(nodes)).value
-            errors.append(abs(float(estimate) - exact[name]))
+            estimate = rule.integrate(jnp.asarray(weights), samples).value  # → ()
+            # E = |Î − I|
+            error = abs(float(estimate) - exact[name])                      # → ()
+            errors.append(error)
     print(f"{n_nodes:2d}  " + "  ".join(f"{error:.2e}" for error in errors))
 ```
 
@@ -144,9 +178,15 @@ On the smooth band the Gauss rule reaches round-off with 32 nodes, while the tra
 The local rule has one more card to play. Its error comes from the tile that holds the kink, so a tile boundary placed on the kink removes it. With eleven equally spaced nodes there is a node at $\mu = \pm 0.8$, every tile sees a straight line, and the trapezoid rule is exact.
 
 ```python
+# Shapes: N = 11 nodes in μ = sin φ ∈ [−1, 1]
+
+# the nodes include μ = ±0.8, so every tile sees a straight line
 trap_nodes, trap_weights = trapezoid(11)
+# fₙ = f_ice(μₙ)
+ice_samples = ice(trap_nodes)                               # (N,) → (N,)
 # today (integrix)
-estimate = rule.integrate(trap_weights, ice(trap_nodes)).value
+# Î = ∑ₙ wₙ f_ice(μₙ)
+estimate = rule.integrate(trap_weights, ice_samples).value  # → ()
 print(f"N = 11, nodes on the edges: error = {abs(float(estimate) - 0.04):.1e}")
 ```
 

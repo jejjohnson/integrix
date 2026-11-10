@@ -38,17 +38,34 @@ import jax.numpy as jnp
 import numpy as np
 from integrix import rule
 
-# Shapes: D_z = 5 hat functions; N = 4 tiles × 8 Gauss nodes = 32 nodes
+# Shapes: K = 4 tiles; N_G = 8 Gauss nodes per tile; N = 32 nodes; D_z = 5 hats
 
-knots = jnp.arange(5.0)  # → (D_z,)
-# 8 Gauss–Legendre nodes on each tile [k, k + 1]
+# knots sₖ = k, the tile edges and the hat centres
+knots = jnp.arange(5.0)                                      # → (D_z,)
+# 8 Gauss–Legendre nodes ξ_g and weights on the reference tile [−1, 1]
 reference_nodes, reference_weights = np.polynomial.legendre.leggauss(8)
-tile_nodes = 0.5 * (reference_nodes + 1.0)  # → (8,)
-nodes = einx.add("tile, gauss -> (tile gauss)", knots[:-1], tile_nodes)
-weights = jnp.tile(0.5 * reference_weights, 4)  # → (N,)
-# φ_d(s) = max(0, 1 − |s − s_d|), the hat on knot s_d
-distance = einx.subtract("node, basis -> node basis", nodes, knots)
-hats = jnp.maximum(0.0, 1.0 - jnp.abs(distance))  # → (N, D_z)
+# ξ_g + 1
+shifted = reference_nodes + 1.0                              # (N_G,) → (N_G,)
+# t_g = (ξ_g + 1)/2, the same nodes on a tile [k, k + 1] shifted to [0, 1]
+tile_nodes = 0.5 * shifted                                   # (N_G,) → (N_G,)
+# sₖ,g = sₖ + t_g
+nodes = einx.add(                                            # → (N,)
+    "tile, gauss -> (tile gauss)", knots[:-1], tile_nodes
+)
+# w_g = w_ref,g / 2, the same on every tile
+half_weights = 0.5 * reference_weights                       # (N_G,) → (N_G,)
+# wₖ,g = w_g
+weights = jnp.tile(half_weights, 4)                          # (N_G,) → (N,)
+# dₙ,d = sₙ − s_d
+distance = einx.subtract(                                    # → (N, D_z)
+    "node, basis -> node basis", nodes, knots
+)
+# |dₙ,d|
+gap = jnp.abs(distance)                                      # (N, D_z) → (N, D_z)
+# 1 − |dₙ,d|
+slope = 1.0 - gap                                            # (N, D_z) → (N, D_z)
+# φ_d(sₙ) = max(0, 1 − |sₙ − s_d|), the hat on knot s_d
+hats = jnp.maximum(0.0, slope)                               # (N, D_z) → (N, D_z)
 # today (integrix)
 # v_d = ∫ φ_d(s) ds ≈ ∑ₙ wₙ φ_d(sₙ)
 basis_weights = rule.integrate(weights, hats, axis=0).value  # (N, D_z) → (D_z,)
@@ -87,14 +104,14 @@ from functax.interp import Stencil
 # Shapes: N_source = 4 samples; N_target = 3 midpoints, 2 taps each
 
 # today (functax)
-# row k reads (cₖ + cₖ₊₁)/2
-midpoints = Stencil(
+# row k reads Hₖ c = (cₖ + cₖ₊₁)/2
+midpoints = Stencil(                                      # (N_source,) → (N_target,) op
     jnp.array([[0, 1], [1, 2], [2, 3]]),
     jnp.full((3, 2), 0.5),
     n_source=4,
 )
 # the midpoint rule on unit tiles: w_target = (1, 1, 1)
-target_weights = jnp.ones(3)  # → (N_target,)
+target_weights = jnp.ones(3)                              # → (N_target,)
 # today (functax)
 # w_source = Hᵀ w_target
 source_weights = midpoints.apply_adjoint(target_weights)  # → (N_source,)
