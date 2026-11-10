@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.3](https://github.com/jejjohnson/integrix/compare/v0.0.2...v0.0.3) (2026-11-10)
+
+
+### Features
+
+* **adapt:** add adaptive Gauss–Kronrod with a static buffer and a custom JVP ([#43](https://github.com/jejjohnson/integrix/issues/43)) ([4d7773f](https://github.com/jejjohnson/integrix/commit/4d7773fdef402073092a4f5709072c5e4d39593f)), closes [#24](https://github.com/jejjohnson/integrix/issues/24)
+* **adapt:** add tanh–sinh, Romberg and cumulative adaptive integrals ([#44](https://github.com/jejjohnson/integrix/issues/44)) ([1c7abf3](https://github.com/jejjohnson/integrix/commit/1c7abf35a90836a5add200b3d68c91b3af5f919d)), closes [#25](https://github.com/jejjohnson/integrix/issues/25)
+* **adjoint:** add Checkpointed and checkpointed_scan, and wire adjoint= into run ([#41](https://github.com/jejjohnson/integrix/issues/41)) ([3d83215](https://github.com/jejjohnson/integrix/commit/3d83215f014a01de449a7b69ba57e4ef5e11ef5a)), closes [#23](https://github.com/jejjohnson/integrix/issues/23)
+* **adjoint:** add Truncated and to_diffrax_adjoint from pipekit-jax ([#39](https://github.com/jejjohnson/integrix/issues/39)) ([7d9045e](https://github.com/jejjohnson/integrix/commit/7d9045e1370837bce6881de82d76170a919c54b1))
+* **expect:** add Monte Carlo, randomised quasi-Monte Carlo and importance sampling ([#45](https://github.com/jejjohnson/integrix/issues/45)) ([ce5aa00](https://github.com/jejjohnson/integrix/commit/ce5aa001cf2f1e4f2f0dc4d31313428682a9545a)), closes [#27](https://github.com/jejjohnson/integrix/issues/27)
+
 ## [0.0.2](https://github.com/jejjohnson/integrix/compare/v0.0.1...v0.0.2) (2026-11-09)
 
 

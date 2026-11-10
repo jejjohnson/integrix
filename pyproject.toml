@@ -1,6 +1,6 @@
 [project]
 name = "integrix"
-version = "0.0.2"
+version = "0.0.3"
 description = "Integration for JAX: rules, scans and time steppers, with shared adaptivity and adjoints."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
