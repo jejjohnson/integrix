@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.4](https://github.com/jejjohnson/integrix/compare/v0.0.3...v0.0.4) (2026-11-10)
+
+
+### Features
+
+* **rule:** accept a batch of weight functions in weighted_mean ([#62](https://github.com/jejjohnson/integrix/issues/62)) ([b3921c9](https://github.com/jejjohnson/integrix/commit/b3921c9316333f104e9aa38c8647f4aaa2ad3ceb))
+* **rule:** add where= and nan_policy= to integrate and weighted_mean ([#61](https://github.com/jejjohnson/integrix/issues/61)) ([4f2e4ce](https://github.com/jejjohnson/integrix/commit/4f2e4ce4a4b3d62fd9507d4e0af4a7675fc8cb1c))
+
 ## [0.0.3](https://github.com/jejjohnson/integrix/compare/v0.0.2...v0.0.3) (2026-11-10)
 
 

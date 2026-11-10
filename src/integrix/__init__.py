@@ -17,7 +17,7 @@ from __future__ import annotations
 from integrix.exceptions import IntegrixError, ValidationError
 
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 __all__ = [
     "IntegrixError",
