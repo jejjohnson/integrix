@@ -92,27 +92,39 @@ The column and the band radiance of the day, on toy data. A linear methane profi
 ```python
 import jax.numpy as jnp
 from integrix import rule
+from jaxtyping import Array, Float
 
-# Shapes: N_P = 21 pressure levels; N_S = 401 wavelengths
+# Shapes: N_P = 21 pressure levels; N_S = 401 wavelengths; N nodes of a rule
 
 
-def trapezoid_weights(nodes):
+# user
+def trapezoid_weights(nodes: Float[Array, "node"]) -> Float[Array, "node"]:
     """wₙ = (sₙ₊₁ − sₙ₋₁)/2 inside, half a spacing at each end."""
-    # user
-    widths = jnp.diff(nodes)
-    zero = jnp.zeros(1, dtype=nodes.dtype)
-    return 0.5 * (jnp.concatenate([widths, zero]) + jnp.concatenate([zero, widths]))
+    # hₙ = sₙ₊₁ − sₙ
+    widths = jnp.diff(nodes)                                 # (N,) → (N - 1,)
+    # padding for the two ends, where one neighbour is missing
+    zero = jnp.zeros(1, dtype=nodes.dtype)                   # → (1,)
+    # rₙ = hₙ, with r_N = 0
+    right = jnp.concatenate([widths, zero])                  # (N - 1,) → (N,)
+    # lₙ = hₙ₋₁, with l₁ = 0
+    left = jnp.concatenate([zero, widths])                   # (N - 1,) → (N,)
+    # wₙ = (rₙ + lₙ)/2
+    return 0.5 * (right + left)
 
 
 # pₙ from the top of the atmosphere to the surface, hPa
-pressure = jnp.linspace(0.0, 1013.0, 21)  # → (N_P,)
-# c(p) = 1600 + 300 p/p_s, ppb
-methane = 1600.0 + 300.0 * pressure / 1013.0  # (N_P,) → (N_P,)
-pressure_weights = trapezoid_weights(pressure)  # (N_P,) → (N_P,)
+pressure = jnp.linspace(0.0, 1013.0, 21)                     # → (N_P,)
+# 300 pₙ
+slope_term = 300.0 * pressure                                # (N_P,) → (N_P,)
+# c(pₙ) = 1600 + 300 pₙ/p_s, ppb
+methane = 1600.0 + slope_term / 1013.0                       # (N_P,) → (N_P,)
+# wₙ = (pₙ₊₁ − pₙ₋₁)/2
+pressure_weights = trapezoid_weights(pressure)               # (N_P,) → (N_P,)
 # today (integrix)
-# XCH₄ = (1/p_s) ∑ₙ wₙ c(pₙ)
+# I = ∑ₙ wₙ c(pₙ)
 column_integral = rule.integrate(pressure_weights, methane)  # → ()
-column_average = column_integral.value / pressure[-1]  # → ()
+# XCH₄ = I / p_s
+column_average = column_integral.value / pressure[-1]        # → ()
 print(f"XCH4 = {float(column_average):.1f} ppb")
 ```
 
@@ -123,16 +135,25 @@ XCH4 = 1750.0 ppb
 The band radiance is a weighted mean: a toy spectrum with one absorption line at 2300 nm, seen by a channel with a Gaussian response 5 nm wide.
 
 ```python
+# Shapes: N_S = 401 wavelengths
+
 # λₙ, nm
-wavelength = jnp.linspace(2280.0, 2320.0, 401)  # → (N_S,)
-# L(λ) = 1 − 0.4 exp(−(λ − 2300)²/2)
-spectrum = 1.0 - 0.4 * jnp.exp(-0.5 * (wavelength - 2300.0) ** 2)
-# R_c(λ) = exp(−(λ − 2300)²/(2 · 5²))
-response = jnp.exp(-0.5 * ((wavelength - 2300.0) / 5.0) ** 2)
+wavelength = jnp.linspace(2280.0, 2320.0, 401)    # → (N_S,)
+# δₙ = λₙ − 2300
+offset = wavelength - 2300.0                      # (N_S,) → (N_S,)
+# gₙ = exp(−δₙ²/2)
+line_shape = jnp.exp(-0.5 * offset**2)            # (N_S,) → (N_S,)
+# L(λₙ) = 1 − 0.4 gₙ
+spectrum = 1.0 - 0.4 * line_shape                 # (N_S,) → (N_S,)
+# uₙ = δₙ/5
+scaled = offset / 5.0                             # (N_S,) → (N_S,)
+# R_c(λₙ) = exp(−uₙ²/2)
+response = jnp.exp(-0.5 * scaled**2)              # (N_S,) → (N_S,)
+# wₙ = (λₙ₊₁ − λₙ₋₁)/2
 spectral_weights = trapezoid_weights(wavelength)  # (N_S,) → (N_S,)
 # today (integrix)
 # L_c = ∑ₙ wₙ Rₙ Lₙ / ∑ₙ wₙ Rₙ
-band_radiance = rule.weighted_mean(  # → ()
+band_radiance = rule.weighted_mean(               # → ()
     spectral_weights, spectrum, weight=response
 )
 print(f"L_c = {float(band_radiance):.3f}")

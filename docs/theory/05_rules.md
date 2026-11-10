@@ -38,48 +38,92 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from integrix import rule
+from jaxtyping import Array, Float
 
 # Shapes: N_φ latitudes; N_ϑ = 2 N_φ longitudes
 
 
+# user
 class Rule(eqx.Module):
     """Nodes and weights: a stand-in for functax's rules (functax#44)."""
 
-    # user
-    nodes: jax.Array
-    weights: jax.Array
+    nodes: Float[Array, "node"]
+    weights: Float[Array, "node"]
 
 
-def temperature(latitude, longitude):
+# user
+def temperature(
+    latitude: Float[Array, "lat"], longitude: Float[Array, "lon"]
+) -> Float[Array, "lat lon"]:
     """T(φ, ϑ) = 288 − 30 sin²φ + 5 cos φ cos ϑ, in K."""
-    # user
-    zonal = 288.0 - 30.0 * jnp.sin(latitude) ** 2  # → (N_φ,)
-    wave = einx.multiply("lat, lon -> lat lon", jnp.cos(latitude), jnp.cos(longitude))
-    return einx.add("lat, lat lon -> lat lon", zonal, 5.0 * wave)  # → (N_φ, N_ϑ)
+    # s = sin φ
+    sine = jnp.sin(latitude)                                    # (N_φ,) → (N_φ,)
+    # T_z(φ) = 288 − 30 s²
+    zonal = 288.0 - 30.0 * sine**2                              # → (N_φ,)
+    # c_φ = cos φ
+    cos_lat = jnp.cos(latitude)                                 # → (N_φ,)
+    # c_ϑ = cos ϑ
+    cos_lon = jnp.cos(longitude)                                # (N_ϑ,) → (N_ϑ,)
+    # wave(φ, ϑ) = cos φ cos ϑ
+    wave = einx.multiply("lat, lon -> lat lon", cos_lat, cos_lon)  # → (N_φ, N_ϑ)
+    # a = 5 wave
+    amplitude = 5.0 * wave                                      # → (N_φ, N_ϑ)
+    # T = T_z + a
+    field = einx.add("lat, lat lon -> lat lon", zonal, amplitude)  # → (N_φ, N_ϑ)
+    return field
 
 
 labels = ("unweighted", "cell areas", "Gauss")
 print("N_φ  " + "  ".join(f"{label:>11}" for label in labels))
 for n_lat in (4, 8, 16, 32):
+    # N_ϑ = 2 N_φ
     n_lon = 2 * n_lat
-    # ϑₖ = 2π k / N_ϑ, wₖ = 2π / N_ϑ
-    longitude = 2.0 * jnp.pi * jnp.arange(n_lon) / n_lon  # → (N_ϑ,)
-    longitude_rule = Rule(longitude, jnp.full(n_lon, 2.0 * jnp.pi / n_lon))
-    # local: band centres, wⱼ = sin φⱼ₊½ − sin φⱼ₋½
-    edges = jnp.linspace(-jnp.pi / 2, jnp.pi / 2, n_lat + 1)  # → (N_φ + 1,)
-    centres = 0.5 * (edges[1:] + edges[:-1])  # → (N_φ,)
-    cell_rule = Rule(centres, jnp.diff(jnp.sin(edges)))
-    # global: Gauss–Legendre in μ = sin φ
-    mu_nodes, mu_weights = np.polynomial.legendre.leggauss(n_lat)
-    gauss_rule = Rule(jnp.arcsin(mu_nodes), jnp.asarray(mu_weights))
+    # 2π, one full turn
+    full_turn = 2.0 * jnp.pi
+    # k = 0, …, N_ϑ − 1
+    ordinal = jnp.arange(n_lon)                                 # → (N_ϑ,)
+    # ϑₖ = 2π k / N_ϑ
+    longitude = full_turn * ordinal / n_lon                     # → (N_ϑ,)
+    # wₖ = 2π / N_ϑ
+    width = full_turn / n_lon
+    # wₖ for every longitude
+    longitude_weights = jnp.full(n_lon, width)                  # → (N_ϑ,)
+    longitude_rule = Rule(longitude, longitude_weights)
+    # local: π/2, half of the latitude range
+    half_pi = jnp.pi / 2
+    # φⱼ₊½ = −π/2 + j π/N_φ, the band edges
+    edges = jnp.linspace(-half_pi, half_pi, n_lat + 1)          # → (N_φ + 1,)
+    # φⱼ₊½ for j = 1, …, N_φ
+    upper_edges = edges[1:]                                     # → (N_φ,)
+    # φⱼ₋½ for j = 1, …, N_φ
+    lower_edges = edges[:-1]                                    # → (N_φ,)
+    # φⱼ = (φⱼ₊½ + φⱼ₋½)/2
+    centres = 0.5 * (upper_edges + lower_edges)                 # → (N_φ,)
+    # sⱼ₊½ = sin φⱼ₊½
+    sine_edges = jnp.sin(edges)                                 # → (N_φ + 1,)
+    # wⱼ = sin φⱼ₊½ − sin φⱼ₋½
+    band_areas = jnp.diff(sine_edges)                           # → (N_φ,)
+    cell_rule = Rule(centres, band_areas)
+    # global: Gauss–Legendre in μ = sin φ, Pₙ(μⱼ) = 0
+    mu_nodes, mu_weights = np.polynomial.legendre.leggauss(n_lat)  # → (N_φ,) ×2
+    # φⱼ = arcsin μⱼ
+    gauss_latitude = jnp.arcsin(mu_nodes)                       # → (N_φ,)
+    # wⱼ = Gauss weight, as a jax array
+    gauss_weights = jnp.asarray(mu_weights)                     # → (N_φ,)
+    gauss_rule = Rule(gauss_latitude, gauss_weights)
     # a plain average of the grid values, for comparison
-    unweighted = jnp.mean(temperature(centres, longitude))  # → ()
+    grid = temperature(centres, longitude)                      # → (N_φ, N_ϑ)
+    # T̄_plain = mean over the grid
+    unweighted = jnp.mean(grid)                                 # → ()
+    # e = T̄ − 278
     errors = [float(unweighted) - 278.0]
     for latitude_rule in (cell_rule, gauss_rule):
-        field = temperature(latitude_rule.nodes, longitude)  # → (N_φ, N_ϑ)
+        field = temperature(latitude_rule.nodes, longitude)     # → (N_φ, N_ϑ)
         # today (integrix)
         # T̄ = (1/4π) ∑ⱼ ∑ₖ wⱼ wₖ T(φⱼ, ϑₖ)
-        total = rule.integrate((latitude_rule, longitude_rule), field, axis=(0, 1))
+        total = rule.integrate(                                 # → ()
+            (latitude_rule, longitude_rule), field, axis=(0, 1)
+        )
         errors.append(float(total.value) / (4.0 * np.pi) - 278.0)
     print(f"{n_lat:3d}  " + "  ".join(f"{error:+11.2e}" for error in errors))
 ```
@@ -108,19 +152,35 @@ where $w_n$ are the quadrature weights in wavelength, $R_n = R_b(\lambda_n)$ the
 
 ```python
 # Shapes: N_λ = 601 wavelengths; N_b = 3 bands
-wavelength = jnp.linspace(2200.0, 2400.0, 601)  # → (N_λ,)
-# L(λ) = 1 − 0.4 exp(−(λ − 2300)²/2): one line at 2300 nm
-spectrum = 1.0 - 0.4 * jnp.exp(-0.5 * (wavelength - 2300.0) ** 2)
-# R_b(λ) = exp(−(λ − λ_b)²/(2 · 10²)), bands at 2250, 2300 and 2350 nm
-band_centres = jnp.array([2250.0, 2300.0, 2350.0])  # → (N_b,)
-offset = einx.subtract("band, wl -> band wl", band_centres, wavelength)
-response = jnp.exp(-0.5 * (offset / 10.0) ** 2)  # → (N_b, N_λ)
-spectra = einx.id("wl -> band wl", spectrum, band=3)  # → (N_b, N_λ)
-spacing = wavelength[1] - wavelength[0]
-weights = jnp.full(601, spacing).at[jnp.array([0, -1])].set(spacing / 2)
+# λₙ = 2200 + 200 (n − 1)/600, in nm
+wavelength = jnp.linspace(2200.0, 2400.0, 601)                  # → (N_λ,)
+# δ = λ − 2300
+line_offset = wavelength - 2300.0                               # → (N_λ,)
+# g = exp(−δ²/2)
+dip = jnp.exp(-0.5 * line_offset**2)                            # → (N_λ,)
+# L(λ) = 1 − 0.4 g: one line at 2300 nm
+spectrum = 1.0 - 0.4 * dip                                      # → (N_λ,)
+# the band centres λ_b, in nm
+band_centres = jnp.array([2250.0, 2300.0, 2350.0])              # → (N_b,)
+# δ_b(λ) = λ_b − λ
+offset = einx.subtract("band, wl -> band wl", band_centres, wavelength)  # → (N_b, N_λ)
+# z = δ_b/10
+scaled = offset / 10.0                                          # → (N_b, N_λ)
+# R_b(λ) = exp(−z²/2) = exp(−(λ − λ_b)²/(2 · 10²))
+response = jnp.exp(-0.5 * scaled**2)                            # → (N_b, N_λ)
+# L_b(λ) = L(λ) for every band
+spectra = einx.id("wl -> band wl", spectrum, band=3)            # → (N_b, N_λ)
+# Δλ = λ₂ − λ₁
+spacing = wavelength[1] - wavelength[0]                         # → ()
+# Δλ/2
+half_spacing = spacing / 2                                      # → ()
+# the two end nodes
+ends = jnp.array([0, -1])
+# wₙ = Δλ, with Δλ/2 at the ends
+weights = jnp.full(601, spacing).at[ends].set(half_spacing)     # → (N_λ,)
 # today (integrix)
 # L_b = ∑ₙ wₙ R_b(λₙ) L(λₙ) / ∑ₙ wₙ R_b(λₙ)
-bands = rule.weighted_mean(weights, spectra, weight=response)  # → (N_b,)
+bands = rule.weighted_mean(weights, spectra, weight=response)   # → (N_b,)
 print("L_b =", [round(float(band), 4) for band in bands])
 ```
 
@@ -138,20 +198,28 @@ We add $2^{20}$ copies of $0.1$ in float32, once with a left-to-right `jax.lax.s
 
 ```python
 # Shapes: N = 2²⁰ terms
-values = jnp.full(2**20, 0.1, dtype=jnp.float32)  # → (N,)
+# vₙ = float32(0.1)
+values = jnp.full(2**20, 0.1, dtype=jnp.float32)                # → (N,)
 
 
-def add(total, value):
+# user
+def add(
+    total: Float[Array, ""], value: Float[Array, ""]
+) -> tuple[Float[Array, ""], None]:
     """One step of a left-to-right sum."""
-    # user
-    return total + value, None
+    # Sₙ = Sₙ₋₁ + vₙ
+    running = total + value                                     # → ()
+    return running, None
 
 
 # S = ((v₁ + v₂) + v₃) + …
-left_to_right, _ = jax.lax.scan(add, jnp.float32(0.0), values)
+left_to_right, _ = jax.lax.scan(add, jnp.float32(0.0), values)  # → ()
+# wₙ = 1
+unit_weights = jnp.ones(2**20, dtype=jnp.float32)               # → (N,)
 # today (integrix)
-# S = ∑ₙ 1 · vₙ, summed pairwise
-pairwise = rule.integrate(jnp.ones(2**20, dtype=jnp.float32), values).value
+# S = ∑ₙ wₙ vₙ, summed pairwise
+pairwise = rule.integrate(unit_weights, values).value           # → ()
+# S = N v₀
 exact = 2**20 * float(np.float32(0.1))
 print(f"left to right: {float(left_to_right):.1f}")
 print(f"pairwise:      {float(pairwise):.1f}")

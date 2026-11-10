@@ -105,6 +105,8 @@ packages = ["src/integrix"]
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+# pre-commit passes file paths explicitly; honour the excludes for them too
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -129,6 +131,10 @@ lines-after-imports = 2
 # Format the code inside ``Examples:`` doctest blocks like real source.
 docstring-code-format = true
 docstring-code-line-length = 72
+# The code blocks in the docs follow the code-sketch standard, whose aligned
+# shape column (`x = f(y)        # (N,) → (N,)`) the formatter would collapse.
+# tests/test_theory_pages.py runs them instead.
+exclude = ["docs/**/*.md"]
 
 [tool.ty.environment]
 python-version = "3.12"

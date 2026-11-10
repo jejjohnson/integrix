@@ -35,22 +35,36 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 from integrix import adapt, rule
+from jaxtyping import Array, Float
 
 # Shapes: N wavelengths on a fixed grid
 
+# λ₀ and γ_L, in nm
 centre, half_width = 2300.0, 0.05
+# the band [a, b], in nm
 lower, upper = 2280.0, 2320.0
 
 
-def line(wavelength):
+# user
+def line(wavelength: Float[Array, "node"]) -> Float[Array, "node"]:
     """ℓ(λ) = (γ_L/π) / ((λ − λ₀)² + γ_L²), in nm⁻¹."""
-    # user
-    return (half_width / jnp.pi) / ((wavelength - centre) ** 2 + half_width**2)
+    # δ = λ − λ₀
+    offset = wavelength - centre                                # (N,) → (N,)
+    # d = δ² + γ_L²
+    denominator = offset**2 + half_width**2                     # → (N,)
+    # a = γ_L/π
+    amplitude = half_width / jnp.pi                             # → ()
+    # ℓ = a / d
+    profile = amplitude / denominator                           # → (N,)
+    return profile
 
 
-exact = (
-    np.arctan((upper - centre) / half_width) - np.arctan((lower - centre) / half_width)
-) / np.pi
+# rₐ = (a − λ₀)/γ_L
+lower_ratio = (lower - centre) / half_width
+# r_b = (b − λ₀)/γ_L
+upper_ratio = (upper - centre) / half_width
+# I = (arctan r_b − arctan rₐ)/π
+exact = (np.arctan(upper_ratio) - np.arctan(lower_ratio)) / np.pi
 
 # today (integrix)
 # I ≈ ∑ over subintervals of K₁₅, refined until ∑ E ≤ rtol |I|
@@ -61,11 +75,21 @@ print(
     f"estimate {float(adaptive.error):.1e}, converged {bool(adaptive.converged)}"
 )
 for n_nodes in (401, 4001):
-    wavelength = jnp.linspace(lower, upper, n_nodes)  # → (N,)
-    spacing = wavelength[1] - wavelength[0]
-    weights = jnp.full(n_nodes, spacing).at[jnp.array([0, -1])].set(spacing / 2)
+    # λₙ = a + (b − a)(n − 1)/(N − 1)
+    wavelength = jnp.linspace(lower, upper, n_nodes)            # → (N,)
+    # Δλ = λ₂ − λ₁
+    spacing = wavelength[1] - wavelength[0]                     # → ()
+    # Δλ/2, the trapezoid weight at the ends
+    half_spacing = spacing / 2                                  # → ()
+    # the two end nodes
+    ends = jnp.array([0, -1])
+    # wₙ = Δλ, with Δλ/2 at the ends
+    weights = jnp.full(n_nodes, spacing).at[ends].set(half_spacing)  # → (N,)
+    # ℓₙ = ℓ(λₙ)
+    samples = line(wavelength)                                  # → (N,)
     # today (integrix)
-    estimate = rule.integrate(weights, line(wavelength)).value
+    # I ≈ ∑ₙ wₙ ℓₙ
+    estimate = rule.integrate(weights, samples).value           # → ()
     print(
         f"trapezoid:     {n_nodes:5d} evaluations, "
         f"error {abs(float(estimate) - exact):.1e}"
@@ -90,26 +114,34 @@ Two more adaptive rules sit next to Gauss–Kronrod, each for a different kind o
 Tanh–sinh gives the strength of the whole line, over all wavelengths. It wants the feature to sit on the unit scale, since its nodes cluster around the origin, so we integrate in units of the half-width, $u = (\lambda - \lambda_0) / \gamma_\text{L}$, where the line is $\frac{1}{\pi (1 + u^2)}$ and its integral over the real line is exactly 1.
 
 ```python
+# Shapes: scalar integrals; u dimensionless, in units of γ_L
+# u = (λ − λ₀)/γ_L, so ℓ du = 1/(π (1 + u²))
+unit_line = lambda u: 1.0 / (jnp.pi * (1.0 + u**2))
 # today (integrix)
 # ∫ from −∞ to ∞ of 1/(π (1 + u²)) du = 1
-strength = adapt.TanhSinh()(lambda u: 1.0 / (jnp.pi * (1.0 + u**2)), -jnp.inf, jnp.inf)
+strength = adapt.TanhSinh()(unit_line, -jnp.inf, jnp.inf)       # → ()
 print(
     f"tanh-sinh: error {abs(float(strength.value) - 1.0):.1e}, "
     f"converged {bool(strength.converged)}"
 )
 
 # a smooth Gaussian response: R(λ) = exp(−(λ − λ₀)²/(2 · 5²))
-response_integral = (
-    5.0
-    * np.sqrt(2.0 * np.pi)
-    * float(jax.scipy.special.erf(20.0 / (5.0 * np.sqrt(2.0))))
-)
+gaussian = lambda lam: jnp.exp(-0.5 * ((lam - centre) / 5.0) ** 2)
+# P = 5 √(2π)
+prefactor = 5.0 * np.sqrt(2.0 * np.pi)
+# z = 20/(5 √2)
+argument = 20.0 / (5.0 * np.sqrt(2.0))
+# φ = erf z
+fraction = float(jax.scipy.special.erf(argument))
+# ∫ R dλ over the band = P φ
+response_integral = prefactor * fraction
 # today (integrix)
-romberg = adapt.Romberg()(
-    lambda lam: jnp.exp(-0.5 * ((lam - centre) / 5.0) ** 2), lower, upper
-)
+# ∫ from a to b of R(λ) dλ, by Richardson extrapolation of the trapezoid rule
+romberg = adapt.Romberg()(gaussian, lower, upper)               # → ()
+# e = |Î − I|
+romberg_error = abs(float(romberg.value) - response_integral)
 print(
-    f"Romberg on the response: error {abs(float(romberg.value) - response_integral):.1e}, "
+    f"Romberg on the response: error {romberg_error:.1e}, "
     f"converged {bool(romberg.converged)}"
 )
 ```
@@ -130,34 +162,45 @@ An adaptive rule decides at run time how many subintervals it needs, and `jit` w
 The second point is easy to trip over, so we show it: with room for only four subintervals the line integral stops early and says so, and the derivative with respect to the line width is checked against a finite difference of the exact integral.
 
 ```python
+# Shapes: scalar width γ_L; scalar integral
 # today (integrix)
-cramped = adapt.GaussKronrod(rtol=1e-8, max_intervals=4)(line, lower, upper)
+# I ≈ ∑ over four subintervals of K₁₅
+cramped = adapt.GaussKronrod(rtol=1e-8, max_intervals=4)(line, lower, upper)  # → ()
 print(
     f"4 subintervals: error {abs(float(cramped.value) - exact):.1e}, "
     f"converged {bool(cramped.converged)}"
 )
 
 
-def band_integral(width):
+# user
+def band_integral(width: Float[Array, ""]) -> Float[Array, ""]:
     """∫ ℓ(λ; γ_L) dλ over the band, adaptively."""
-    # user
+    # ℓ(λ; γ_L) = (γ_L/π) / ((λ − λ₀)² + γ_L²)
     profile = lambda lam: (width / jnp.pi) / ((lam - centre) ** 2 + width**2)
     # today (integrix)
+    # I(γ_L) ≈ ∑ over subintervals of K₁₅
     return adapt.GaussKronrod(rtol=1e-10)(profile, lower, upper).value
 
 
-def exact_band(width):
+# user
+def exact_band(width: float) -> float:
     """(1/π)(arctan((b − λ₀)/γ_L) − arctan((a − λ₀)/γ_L))."""
-    # user
-    return (
-        np.arctan((upper - centre) / width) - np.arctan((lower - centre) / width)
-    ) / np.pi
+    # r_b = (b − λ₀)/γ_L
+    upper_ratio = (upper - centre) / width
+    # rₐ = (a − λ₀)/γ_L
+    lower_ratio = (lower - centre) / width
+    # I(γ_L) = (arctan r_b − arctan rₐ)/π
+    return (np.arctan(upper_ratio) - np.arctan(lower_ratio)) / np.pi
 
 
+# dI/dγ_L, by autodiff through the final Kronrod rule
 derivative = float(jax.jit(jax.grad(band_integral))(half_width))
-finite_difference = (
-    exact_band(half_width + 1e-7) - exact_band(half_width - 1e-7)
-) / 2e-7
+# I(γ_L + δ)
+upper_value = exact_band(half_width + 1e-7)
+# I(γ_L − δ)
+lower_value = exact_band(half_width - 1e-7)
+# dI/dγ_L ≈ (I(γ_L + δ) − I(γ_L − δ))/2δ
+finite_difference = (upper_value - lower_value) / 2e-7
 print(f"d/dγ_L: {derivative:.6f} (finite difference {finite_difference:.6f})")
 ```
 

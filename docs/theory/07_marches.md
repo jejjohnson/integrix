@@ -50,45 +50,67 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
+from collections.abc import Callable
+from typing import Any
+
 import diffrax as dfx
 import einx
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 from integrix import march
+from jaxtyping import Array, Float
 
 # Shapes: D_x = 1, a scalar state
 
 
-def one_step(solver, tendency, state, step):
+# user
+def one_step(
+    solver: dfx.AbstractSolver,
+    tendency: Callable[..., Any],
+    state: Float[Array, ""],
+    step: float,
+) -> Float[Array, ""]:
     """One step of h from t = 0 with a diffrax solver."""
-    # user
+    # today (diffrax)
+    # ẋ = f(x, t)
     term = dfx.ODETerm(tendency)
+    # today (diffrax)
+    # x(h) = x(0) + ∫₀ʰ f(x(t), t) dt, one step
     solution = dfx.diffeqsolve(
         term, solver, t0=0.0, t1=step, dt0=step, y0=state, max_steps=2
     )
     return solution.ys[0]
 
 
-def degree_of_exactness(solver):
+# user
+def degree_of_exactness(solver: dfx.AbstractSolver) -> int:
     """The largest m for which one step integrates tᵐ over [0, 1] exactly."""
-    # user
+    # no degree is exact yet
     degree = -1
     for power in range(8):
-        # ẋ = tᵐ, so x(1) = 1/(m + 1)
-        estimate = one_step(solver, lambda t, x, args: t**power, jnp.asarray(0.0), 1.0)
+        # ẋ = tᵐ
+        monomial = lambda t, x, args: t**power
+        # x(1) = 1/(m + 1)
+        estimate = one_step(solver, monomial, jnp.asarray(0.0), 1.0)  # → ()
+        # e = |x̂(1) − 1/(m + 1)|
         if abs(float(estimate) - 1.0 / (power + 1)) > 1e-12:
             break
         degree = power
     return degree
 
 
-# today (integrix)
+# the five steppers whose rules we compare
 steppers = {
+    # today (integrix)
     "ForwardEulerDfx": march.ForwardEulerDfx(),
+    # today (integrix)
     "RK2Heun": march.RK2Heun(),
+    # today (integrix)
     "RK3SSP": march.RK3SSP(),
+    # today (integrix)
     "RK4Classic": march.RK4Classic(),
+    # today (integrix)
     "SSP_RK104": march.SSP_RK104(),
 }
 for name, solver in steppers.items():
@@ -110,15 +132,26 @@ Euler is the left rectangle and integrates only constants. Heun is the trapezoid
 A multistep method reuses tendencies it has already computed instead of predicting new stages. Adams–Bashforth interpolates the last few tendencies $f_k, f_{k-1}, \ldots$ with a polynomial in time and integrates that polynomial over the next step, which is the interpolatory construction of chapter 2 with nodes at the past times. In units of $h$, the nodes are $0, -1, -2, \ldots$, the interval is $[0, 1]$, and the weights solve the moment equations [](#eq-moments) with $b_m = \int_0^1 t^m \mathrm{d}t = 1/(m + 1)$.
 
 ```python
+# Shapes: N = 2 or 3 past times, the nodes of the rule
 for n_past, scale in ((2, 2), (3, 12)):
-    # nodes at the past times 0, −1, −2 (in units of h)
-    past_times = -jnp.arange(float(n_past))  # → (n,)
+    # n = 0, …, N − 1
+    ordinal = jnp.arange(float(n_past))                         # → (N,)
+    # tₙ = −n, the past times (in units of h)
+    past_times = -ordinal                                       # → (N,)
+    # Vₙₘ = tₙᵐ
+    vander = jnp.vander(past_times, increasing=True)            # → (N, N)
     # [V]ₘₙ = tₙᵐ
-    vandermonde = einx.id("n m -> m n", jnp.vander(past_times, increasing=True))
+    vandermonde = einx.id("n m -> m n", vander)                 # → (N, N)
+    # m + 1 = 1, …, N
+    powers = jnp.arange(1.0, n_past + 1.0)                      # → (N,)
     # bₘ = ∫₀¹ tᵐ dt = 1/(m + 1)
-    moments = 1.0 / jnp.arange(1.0, n_past + 1.0)  # → (n,)
-    operator = lx.MatrixLinearOperator(vandermonde)
-    weights = lx.linear_solve(operator, moments).value  # → (n,)
+    moments = 1.0 / powers                                      # → (N,)
+    # today (lineax)
+    # V = [V]ₘₙ as an operator
+    operator = lx.MatrixLinearOperator(vandermonde)             # (N, N) operator
+    # today (lineax)
+    # V w = b
+    weights = lx.linear_solve(operator, moments).value          # → (N,)
     print(f"AB{n_past}: {jnp.round(weights * scale, 10).tolist()} / {scale}")
 ```
 
@@ -138,21 +171,30 @@ $$\Vert \vect{x}_K - \vect{x}(T) \Vert = O(h^q), \quad K = T / h$$ (eq-global-er
 one power of $h$ lower, since there are $O(1/h)$ steps and the dynamics carry each local error forward without blowing it up (for a stable problem). The order $q$ of a method is its global order, and it is what integrix's order test measures: `tests/march/test_order.py` runs each stepper on the decay problem $\dot{x} = \gamma x$ with $\gamma = -1$ to $T = 1$ and fits the slope of $\log$ error against $\log h$. We run the same problem with the same step sizes and measure both errors.
 
 ```python
-# Shapes: D_x = 1; four step sizes h
+# Shapes: D_x = 1; K = T/h steps; N_h = 4 step sizes h
 
 
-def decay(t, state, args):
+# user
+def decay(
+    t: float, state: Float[Array, ""], args: Any
+) -> Float[Array, ""]:
     """ẋ = γ x with γ = −1."""
-    # user
+    # ẋ = γ x
     return -state
 
 
-def final_state(solver, step):
+# user
+def final_state(solver: dfx.AbstractSolver, step: float) -> Float[Array, ""]:
     """x(T) at T = 1 with constant steps h."""
-    # user
+    # K = T/h
     n_steps = round(1.0 / step)
+    # today (diffrax)
+    # ẋ = γ x
+    term = dfx.ODETerm(decay)
+    # today (diffrax)
+    # x(T) = x(0) + ∫₀ᵀ γ x dt, in K steps of h
     solution = dfx.diffeqsolve(
-        dfx.ODETerm(decay),
+        term,
         solver,
         t0=0.0,
         t1=1.0,
@@ -164,19 +206,26 @@ def final_state(solver, step):
 
 
 cases = {
+    # today (integrix)
     "RK2Heun": (march.RK2Heun(), np.array([0.04, 0.02, 0.01, 0.005])),
+    # today (integrix)
     "RK3SSP": (march.RK3SSP(), np.array([0.04, 0.02, 0.01, 0.005])),
+    # today (integrix)
     "RK4Classic": (march.RK4Classic(), np.array([0.1, 0.05, 0.025, 0.0125])),
 }
 for name, (solver, steps) in cases.items():
     # local: one step from x(0) = 1 against exp(γh)
+    # ε_loc(h) = |x̂₁ − exp(−h)|
     local = [
         abs(float(one_step(solver, decay, jnp.asarray(1.0), h)) - np.exp(-h))
         for h in steps
     ]
     # global: K = T/h steps against exp(γT)
+    # ε_glob(h) = |x̂_K − exp(−1)|
     global_ = [abs(float(final_state(solver, h)) - np.exp(-1.0)) for h in steps]
+    # q_loc = slope of log ε_loc against log h
     local_slope = np.polyfit(np.log(steps), np.log(local), 1)[0]
+    # q_glob = slope of log ε_glob against log h
     global_slope = np.polyfit(np.log(steps), np.log(global_), 1)[0]
     print(f"{name:11s} local slope {local_slope:.2f}, global slope {global_slope:.2f}")
 ```
@@ -196,10 +245,13 @@ Quadrature has no counterpart to stability, because a rule's samples do not feed
 The global and local thread shows up once more. For advection on a grid, each cell has its own limit, $h \le \Delta s / |u|$ for a speed $u$ and spacing $\Delta s$ (the CFL condition), and diffusion with diffusivity $K$ adds $h \le \Delta s^2 / 2K$. These are local conditions, cell by cell, but the model takes one global step, so the most restrictive cell sets the step for the whole domain. [`stable_step`](xref:api#integrix.march.stable_step) computes that bound. An ocean column with 10 km horizontal cells and 1 m s⁻¹ currents allows a step of about three hours, but adding vertical diffusion of $10^{-2}$ m² s⁻¹ on a 1 m vertical grid cuts it to under a minute.
 
 ```python
+# Shapes: 2 axes (horizontal, vertical), one cell size, speed and diffusivity each
 # today (integrix)
 # h_max = 1 / (∑ᵢ |uᵢ| / Δsᵢ + 2 ∑ᵢ Kᵢ / Δsᵢ²)
-advection_only = march.stable_step((10_000.0,), speed=(1.0,))
-with_diffusion = march.stable_step(
+advection_only = march.stable_step((10_000.0,), speed=(1.0,))   # → ()
+# today (integrix)
+# h_max = 1 / (∑ᵢ |uᵢ| / Δsᵢ + 2 ∑ᵢ Kᵢ / Δsᵢ²)
+with_diffusion = march.stable_step(                             # → ()
     (10_000.0, 1.0), speed=(1.0, 0.0), diffusivity=(0.0, 1e-2)
 )
 print(f"advection only:            h_max = {float(advection_only):.0f} s")
