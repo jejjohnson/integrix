@@ -54,6 +54,23 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 | $\vect{c}$ | $\mathbb{R}^{N_\text{source}}$ | the source values of a read-out | |
 :::
 
+## Time stepping
+
+:::{table} Time stepping, from chapter 7.
+:label: tbl-notation-marches
+
+| Symbol | Shape | Meaning | In code |
+| --- | --- | --- | --- |
+| $\vect{x}(t)$, $\vect{x}_k$ | $\mathbb{R}^{D_x}$ | the state, and its value at $t_k = t_0 + k h$ | `y0`, `state` |
+| $f(\vect{x}, t)$ | $\mathbb{R}^{D_x}$ | the tendency, which is the integrand of a march | `rhs`, `rhs_fn` |
+| $h$, $K$ | | the step, and the number of steps to the end time $T = K h$ | `dt`, `n_steps` |
+| $a_{ij}$, $b_i$, $c_i$, $N_\text{stage}$ | | the Butcher coefficients of a Runge–Kutta method, and its number of stages | |
+| $\vect{k}_i$ | $\mathbb{R}^{D_x}$ | the stage tendencies | |
+| $\gamma$, $\zeta = h \gamma$, $R(\zeta)$ | $\mathbb{C}$ | an eigenvalue of the linearised tendency, its scaled form, and a stepper's stability function | |
+:::
+
+The Butcher weights $b_i$ are a rule's weights on $[0, 1]$ and have nothing to do with the moments $b_m$ of chapter 2; the two never meet on one page.
+
 ## Physical symbols
 
 Each page declares the physical symbols it uses in its own table. The ones that recur are wavelength $\lambda$ (nm), pressure $p$ and surface pressure $p_\text{s}$ (hPa), latitude $\phi$ with $\mu = \sin \phi$, longitude $\vartheta$, and height $z$ (m).

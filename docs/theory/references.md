@@ -8,4 +8,14 @@
 
 ## Numerical methods in geophysics
 
-4. Durran, D. R. (2010). *Numerical Methods for Fluid Dynamics: With Applications to Geophysics* (2nd ed.). Springer. Spectral transform models on Gaussian grids, and finite-volume methods (chapter 3).
+4. Durran, D. R. (2010). *Numerical Methods for Fluid Dynamics: With Applications to Geophysics* (2nd ed.). Springer. Spectral transform models on Gaussian grids, and finite-volume methods (chapters 3, 5 and 7).
+
+## Summation and scans
+
+5. Higham, N. J. (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.). SIAM. The error of left-to-right and pairwise summation (chapter 5).
+6. Blelloch, G. E. (1990). *Prefix Sums and Their Applications*. Technical report CMU-CS-90-190, Carnegie Mellon University. Parallel prefix sums in logarithmic depth (chapter 6).
+
+## Time stepping
+
+7. Hairer, E., Nørsett, S. P., & Wanner, G. (1993). *Solving Ordinary Differential Equations I: Nonstiff Problems* (2nd ed.). Springer. Runge–Kutta order conditions, Adams methods, local and global error (chapter 7).
+8. Ketcheson, D. I. (2008). Highly efficient strong stability-preserving Runge–Kutta methods with low-storage implementations. *SIAM Journal on Scientific Computing* 30(4), 2113–2136. The ten-stage, fourth-order SSP method (chapter 7).
