@@ -16,6 +16,10 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, PRNGKeyArray, PyTree
 
+from integrix._src.expect._diagnostics import (
+    effective_sample_size,
+    pareto_smoothed_log_weights,
+)
 from integrix._src.expect._sequences import (
     SOBOL_BITS,
     halton_points,
@@ -42,6 +46,9 @@ class Expectation(eqx.Module):
         n_samples: The number of integrand evaluations S.
         effective_sample_size: (∑ wₛ)² / ∑ wₛ² for importance sampling;
             ``None`` otherwise.
+        pareto_k: The Pareto tail shape k̂ of the importance weights, when
+            `importance` ran with ``diagnostics=True`` (k̂ > 0.7: do not
+            trust the estimate); ``None`` otherwise.
 
     Examples:
         >>> import jax.numpy as jnp
@@ -54,6 +61,7 @@ class Expectation(eqx.Module):
     standard_error: Float[Array, "*out"]
     n_samples: int = eqx.field(static=True)
     effective_sample_size: Float[Array, ""] | None = None
+    pareto_k: Float[Array, ""] | None = None
 
 
 def monte_carlo(
@@ -227,6 +235,7 @@ def importance(
     target_log_prob: Callable[[PyTree], Array],
     n: int,
     *,
+    diagnostics: bool = False,
     key: PRNGKeyArray,
 ) -> Expectation:
     """Self-normalised importance sampling: Î = ∑ₛ wₛ f(xₛ) / ∑ₛ wₛ, xₛ ~ q.
@@ -243,10 +252,14 @@ def importance(
         proposal_log_prob: log q(x) for one draw.
         target_log_prob: log p(x) for one draw, up to an additive constant.
         n: The number of draws S ≥ 2.
+        diagnostics: Also fit the Pareto tail of the weights and report its
+            shape k̂ as ``pareto_k`` (`pareto_smoothed_log_weights`); the
+            estimate itself is not smoothed.
         key: The PRNG key for the proposal.
 
     Returns:
-        The `Expectation`, with ``effective_sample_size``.
+        The `Expectation`, with ``effective_sample_size`` and, with
+        ``diagnostics=True``, ``pareto_k``.
 
     Raises:
         ValidationError: If ``n`` is below 2.
@@ -283,8 +296,11 @@ def importance(
     variance = pairwise_sum(
         einx.multiply("s, s ... -> s ...", normalised**2, deviation**2)
     )
-    # ESS = 1 / ∑ₛ w̃ₛ²
-    effective = 1.0 / pairwise_sum(normalised**2)
+    # ESS = (∑ₛ wₛ)² / ∑ₛ wₛ², from the log weights
+    effective = effective_sample_size(log_weights)
+    pareto_k = None
+    if diagnostics:
+        _, pareto_k = pareto_smoothed_log_weights(log_weights)
     # a target with no support on any draw leaves no weight at all
     value = eqx.error_if(
         value,
@@ -296,6 +312,7 @@ def importance(
         standard_error=jnp.sqrt(variance),
         n_samples=n,
         effective_sample_size=effective,
+        pareto_k=pareto_k,
     )
 
 
