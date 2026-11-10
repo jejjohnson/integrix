@@ -246,6 +246,232 @@ effective sample size: 992 of 4000
 
 The estimate agrees with the grid within about one standard error, and the effective sample size says that the 4000 prior draws are worth about a quarter as many posterior draws, because the likelihood is narrower than the prior and most draws land where it is small.
 
+## When importance weights lie
+
+The effective sample size says how many equal-weight draws the weights are worth, but it is itself estimated from the same weights, and when their distribution has a heavy right tail it can look healthy while the estimate is badly wrong. A heavy tail means that the few largest weights, the ones that decide the answer, are not yet represented in the sample. Pareto-smoothed importance sampling makes this measurable (Vehtari et al.): it fits a generalised Pareto distribution to the largest $M = \lceil \min(N_\mathcal{E}/5, 3\sqrt{N_\mathcal{E}}) \rceil$ weights and reports the fitted tail shape $\hat{k}$. The weight variance is finite only for $k < 1/2$, and above about $\hat{k} = 0.7$ the estimate should not be trusted whatever the effective sample size says. In integrix, [`effective_sample_size`](xref:api#integrix.expect.effective_sample_size) and [`pareto_smoothed_log_weights`](xref:api#integrix.expect.pareto_smoothed_log_weights) compute the two diagnostics from log weights, and `importance(..., diagnostics=True)` reports $\hat{k}$ as `pareto_k`.
+
+We estimate $\mathbb{E}[X^2] = 1$ for $X \sim \mathcal{N}(0, 1)$ with proposals $\mathcal{N}(0, s^2)$ that get narrower. For this pair the weights $w \propto e^{x^2 (1/s^2 - 1)/2}$ have a Pareto tail with shape $k = 1 - s^2$ when $s < 1$, so we know the right answer for $\hat{k}$ too.
+
+```python
+# Shapes: N_E = 4000 draws of a scalar x
+draws_key = jax.random.key(0)
+print(" s    estimate   std err    ESS    k_hat   k = 1 - s^2")
+for proposal_scale in (2.0, 1.0, 0.8, 0.6, 0.4, 0.3):
+
+    # user
+    def proposal_draws(
+        key: PRNGKeyArray, n: int, scale: float = proposal_scale
+    ) -> Float[Array, "draw"]:
+        """x⁽ᵉ⁾ ~ 𝒩(0, s²)."""
+        # x = s ε, ε ~ 𝒩(0, 1)
+        return scale * jax.random.normal(key, (n,))
+
+    # user
+    def proposal_log_density(
+        x: Float[Array, ""], scale: float = proposal_scale
+    ) -> Float[Array, ""]:
+        """log q(x) = log 𝒩(x; 0, s²)."""
+        # log 𝒩(x; 0, s²)
+        return stats.norm.logpdf(x, scale=scale)
+
+    # today (integrix)
+    # Î = ∑ₑ w⁽ᵉ⁾ x⁽ᵉ⁾² / ∑ₑ w⁽ᵉ⁾, with N_eff and k̂ from the same log weights
+    estimate = expect.importance(                          # → value ()
+        jnp.square,
+        proposal_draws,
+        proposal_log_density,
+        stats.norm.logpdf,
+        4000,
+        diagnostics=True,
+        key=draws_key,
+    )
+    # k = 1 − s² for s < 1, no tail otherwise
+    true_k = 1.0 - proposal_scale**2 if proposal_scale < 1.0 else float("nan")
+    print(
+        f"{proposal_scale:3.1f}  {float(estimate.value):9.4f}  "
+        f"{float(estimate.standard_error):8.4f}  "
+        f"{float(estimate.effective_sample_size):6.0f}  "
+        f"{float(estimate.pareto_k):6.2f}  {true_k:6.2f}"
+    )
+```
+
+```text
+ s    estimate   std err    ESS    k_hat   k = 1 - s^2
+2.0     0.9844    0.0176    2653   -1.78     nan
+1.0     0.9913    0.0221    4000     nan     nan
+0.8     0.9679    0.0371    3456    0.31    0.36
+0.6     0.8488    0.0604    1540    0.53    0.64
+0.4     0.5478    0.0562     456    0.68    0.84
+0.3     0.3526    0.0397     282    0.74    0.91
+```
+
+A wide proposal ($s = 2$) is safe: the weights are bounded, $\hat{k}$ is negative, and the estimate is within a standard error of 1. At $s = 1$ the proposal is the target, every weight is equal, and there is no tail to fit, so $\hat{k}$ is NaN. As the proposal narrows the estimate drifts away from 1 while its own standard error stays small: at $s = 0.3$ it reports about $0.35 \pm 0.04$, some sixteen standard errors from the truth, with an effective sample size still in the hundreds. $\hat{k}$ is the number that warns: it passes $1/2$ (infinite weight variance) at $s = 0.6$ and $0.7$ at $s = 0.3$. It follows $k = 1 - s^2$ but underestimates it at this sample size, the more so the heavier the tail, so a $\hat{k}$ near the threshold is already a reason to change the proposal.
+
+## Heavy tails in log space
+
+The methane plumes of an inventory follow a heavy-tailed size distribution: most sources are small, and a few super-emitters carry a large share of the total. Combining that distribution with an instrument's detection probability gives the integrals of an inventory likelihood, such as the fraction of sources an instrument detects,
+
+$$\bar{P} = \int_0^\infty P_d(q) f(q) \mathrm{d}q$$ (eq-detected-fraction)
+
+where $q$ is an emission rate in kg h⁻¹, $f$ its density and $P_d$ the detection probability. Two things go wrong in linear $q$. A grid uniform in $q$ cannot resolve a density whose mass sits at tens of kg h⁻¹ and whose tail reaches $10^5$, and a likelihood built from many such factors underflows long before it is summed. Both are fixed by working in $u = \log q$. The Gauss–Hermite rule of the last section in $\log q$ suits a lognormal $f$, and Simpson's rule on a uniform grid in $u$ resolves a lognormal body and a power-law tail alike (`log_simpson` uses $\mathrm{d}q = e^u \mathrm{d}u$). The sum itself is a log-sum-exp, $\log \sum_n w_n f_n = \mathrm{logsumexp}_n (\log w_n + \log f_n)$, which [`log_integrate`](xref:api#integrix.rule.log_integrate) computes from $\log f$ without ever leaving log space.
+
+We take a lognormal $f$ with median 100 kg h⁻¹ and $\sigma = 1.5$ in $\log q$, and a detection probability that reaches one half at 200 kg h⁻¹, $P_d(q) = 1 - 2^{-q/200}$. A 200-node Gauss–Hermite rule is the reference.
+
+```python
+# Shapes: N = 2001 nodes; K = 32 or 200 Hermite nodes
+# μ = log 100, σ = 1.5 (in log q); q₅₀ = 200 kg/h
+log_median, log_spread, half_detection = np.log(100.0), 1.5, 200.0
+
+
+# user
+def log_detection(rate: Float[Array, "*batch"]) -> Float[Array, "*batch"]:
+    """log P_d(q) = log(1 − 2^(−q/q₅₀))."""
+    # 2^(−q/q₅₀) = exp(−q log 2 / q₅₀)
+    exponent = -np.log(2.0) * rate / half_detection             # → (*B,)
+    # log(1 − e^exponent)
+    return jnp.log(-jnp.expm1(exponent))
+
+
+# user
+def log_density(rate: Float[Array, "*batch"]) -> Float[Array, "*batch"]:
+    """log f(q), the lognormal density with median e^μ and spread σ."""
+    # log q
+    log_rate = jnp.log(rate)                                    # → (*B,)
+    # (log q − μ)² / 2σ²
+    misfit = (log_rate - log_median) ** 2 / (2.0 * log_spread**2)
+    # log f = −log q − log(σ √(2π)) − (log q − μ)²/2σ²
+    return -log_rate - np.log(log_spread * np.sqrt(2.0 * np.pi)) - misfit
+
+
+# today (integrix)
+# log P̄ by Gauss–Hermite in log q, 200 nodes
+reference = expect.log_gauss_hermite(log_detection, log_median, log_spread, n=200)
+# today (integrix)
+# log P̄ by Gauss–Hermite in log q, the default 32 nodes
+hermite = expect.log_gauss_hermite(log_detection, log_median, log_spread)
+
+
+# user
+def log_integrand(rate: Float[Array, "*batch"]) -> Float[Array, "*batch"]:
+    """log P_d(q) + log f(q)."""
+    # log(P_d f)
+    return log_detection(rate) + log_density(rate)
+
+
+# today (integrix)
+# log P̄ by Simpson on a uniform grid in log q over [10⁻³, 10⁷]
+simpson = expect.log_simpson(log_integrand, 1e-3, 1e7)
+# P̄ = e^(log P̄)
+exact = float(jnp.exp(reference))
+print(f"reference P = {exact:.10f}")
+print(f"Gauss-Hermite (32), log q:  error {abs(float(jnp.exp(hermite)) - exact):.1e}")
+print(f"Simpson (2001), log q:      error {abs(float(jnp.exp(simpson)) - exact):.1e}")
+for upper in (1e4, 1e5):
+    # qₙ uniform on [0, q_max], kg/h, and the trapezoid weights
+    rates = jnp.linspace(0.0, upper, 2001)                      # → (N,)
+    # h = q₁ − q₀
+    spacing = rates[1] - rates[0]
+    # wₙ = h inside, h/2 at the ends
+    weights = jnp.full(2001, spacing).at[jnp.array([0, -1])].set(spacing / 2)
+    # q kept away from 0, where log q is −∞
+    positive = jnp.maximum(rates, 1e-300)                       # → (N,)
+    # P_d(qₙ) f(qₙ), 0 at q = 0
+    values = jnp.where(rates > 0, jnp.exp(log_integrand(positive)), 0.0)
+    # today (integrix)
+    # P̄ ≈ ∑ₙ wₙ P_d(qₙ) f(qₙ) on the linear grid
+    linear = rule.integrate(weights, values).value              # → ()
+    print(f"trapezoid (2001), q to {upper:.0e}: error {abs(float(linear) - exact):.1e}")
+```
+
+```text
+reference P = 0.3845823341
+Gauss-Hermite (32), log q:  error 9.2e-07
+Simpson (2001), log q:      error 7.7e-15
+trapezoid (2001), q to 1e+04: error 1.1e-03
+trapezoid (2001), q to 1e+05: error 6.8e-03
+```
+
+The two log-space rules agree with the reference to about $10^{-6}$ (32 Hermite nodes) and $10^{-14}$ (Simpson), while the same 2001 nodes spread uniformly in $q$ miss by 0.3 %, and by almost 2 % when the grid reaches $10^5$, because each extra decade of range takes nodes away from the body. The underflow half of the story needs no grid at all: an inventory likelihood multiplies such a fraction into hundreds of per-source terms, and once their log passes about $-745$ (the smallest positive float64 is near $e^{-745}$), the linear product is zero.
+
+```python
+# Shapes: scalars
+# log L = log P̄ + ∑ of the other log terms, here −1200
+other_terms = -1200.0
+# log L = log P̄ + the other terms: finite
+log_likelihood = float(reference) + other_terms
+# L = P̄ · e^(other terms), formed in linear space: e^(−1200) is 0 in float64
+linear_likelihood = float(jnp.exp(reference) * jnp.exp(other_terms))
+print(f"log space: log L = {log_likelihood:.4f}")
+print(f"linear:    L = {linear_likelihood}, log L = {np.log(linear_likelihood)}")
+```
+
+```text
+log space: log L = -1200.9556
+linear:    L = 0.0, log L = -inf
+```
+
+## An integral to infinity
+
+The last example has an infinite limit. For a point process with intensity $\lambda(t)$ (methane plumes seen by a satellite, say), the number of events in a window is Poisson with mean $\Lambda(t_0, t_0 + s) = \int_{t_0}^{t_0 + s} \lambda(\tau) \mathrm{d}\tau$, so the probability of no event in the next $s$ hours is $e^{-\Lambda(t_0, t_0 + s)}$, and the expected wait for the next event is
+
+$$\mathbb{E}[\Delta t \mid t_0] = \int_0^\infty \exp(-\Lambda(t_0, t_0 + s)) \mathrm{d}s$$ (eq-expected-wait)
+
+with $\Delta t$ the wait in hours. For a constant rate $\lambda$, $\Lambda = \lambda s$ and the wait is $1/\lambda$. A truncated rule would have to guess where the integrand has decayed, which depends on $\lambda$; the tanh–sinh rule of chapter 8 maps $[0, \infty)$ itself onto a finite grid and needs no guess. We check it on a constant rate of 0.3 h⁻¹ and then use it on a rate with a daily cycle, $\lambda(t) = 0.3 (1 + \frac{1}{2} \sin(2 \pi t / 24))$ h⁻¹ from $t_0 = 6$ h, whose $\Lambda$ is closed form; a Gauss–Kronrod integral to 400 h, where the integrand is below $10^{-50}$, is the reference.
+
+```python
+from integrix import adapt
+
+# Shapes: scalars; s in hours
+mean_rate, start_hour = 0.3, 6.0
+
+
+# user
+def survival_constant(wait: Float[Array, ""]) -> Float[Array, ""]:
+    """e^(−λ s), no event in the next s hours at a constant rate."""
+    # e^(−λ s)
+    return jnp.exp(-mean_rate * wait)
+
+
+# user
+def integrated_rate(wait: Float[Array, ""]) -> Float[Array, ""]:
+    """Λ(t₀, t₀ + s) for λ(t) = λ₀ (1 + ½ sin(2πt/24))."""
+    # ω = 2π/24 h⁻¹
+    angular = 2.0 * np.pi / 24.0
+    # cos ω(t₀ + s) − cos ωt₀
+    cycle = jnp.cos(angular * (start_hour + wait)) - np.cos(angular * start_hour)
+    # Λ = λ₀ (s − (cos ω(t₀ + s) − cos ωt₀) / 2ω)
+    return mean_rate * (wait - cycle / (2.0 * angular))
+
+
+# user
+def survival_daily(wait: Float[Array, ""]) -> Float[Array, ""]:
+    """e^(−Λ(t₀, t₀ + s)) for the daily cycle."""
+    # e^(−Λ)
+    return jnp.exp(-integrated_rate(wait))
+
+
+# today (integrix)
+# 𝔼[Δt] = ∫₀^∞ e^(−λ s) ds = 1/λ
+constant = adapt.TanhSinh(rtol=1e-8)(survival_constant, 0.0, jnp.inf)
+# today (integrix)
+# 𝔼[Δt | t₀] = ∫₀^∞ e^(−Λ) ds
+daily = adapt.TanhSinh(rtol=1e-8)(survival_daily, 0.0, jnp.inf)
+# today (integrix)
+# the reference: ∫₀^400 e^(−Λ) ds, with e^(−Λ(400)) < 10⁻⁵⁰
+truncated = adapt.GaussKronrod(rtol=1e-12)(survival_daily, 0.0, 400.0)
+print(f"constant rate: wait {float(constant.value):.10f} h, 1/lambda = "
+      f"{1.0 / mean_rate:.10f} h, converged {bool(constant.converged)}")
+print(f"daily cycle:   wait {float(daily.value):.10f} h, reference "
+      f"{float(truncated.value):.10f} h, {int(daily.n_evaluations)} evaluations")
+```
+
+```text
+constant rate: wait 3.3333333333 h, 1/lambda = 3.3333333333 h, converged True
+daily cycle:   wait 2.5665939158 h, reference 2.5665939158 h, 577 evaluations
+```
+
+The constant rate gives $1/\lambda$ to every digit printed. The daily cycle starts at 6 h, while the rate is rising towards its peak at 12 h, so the expected wait is shorter than the $1/\lambda = 3.33$ h of the mean rate, and tanh–sinh finds it with no truncation point to choose.
+
 ## Gaussian expectations with a closed rule
 
 When $p$ is Gaussian there is a third option: a deterministic rule built for the Gaussian measure. Gauss–Hermite is the Gauss rule of chapter 3 for the weight $e^{-x^2}$, exact for polynomials up to degree $2n - 1$ in each axis, and the unscented transform uses $2 D + 1$ sigma points that match the first two moments. These are global rules again, with the strengths and the $n^D$ cost of chapter 3 (Gauss–Hermite is a tensor rule; the unscented transform avoids the cost by matching moments only). They live in gaussx (`GaussHermiteIntegrator`, `UnscentedIntegrator`), because their natural home is next to the Gaussian solves and filters that use them, and integrix covers the expectations that have no closed rule.
