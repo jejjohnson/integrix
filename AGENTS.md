@@ -64,6 +64,7 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 |---|---|
 | Trapezoid, Simpson, Gauss–Legendre or Clenshaw–Curtis nodes and weights | functax's rules (`functax.quad`, functax#44); never a private copy here |
 | Gauss–Hermite, unscented or sigma-point expectations | gaussx |
+| A hand-written average over posterior draws, `scipy.stats.qmc`, importance weights | `integrix.expect.monte_carlo`, `qmc`, `importance` (an `Expectation` with a standard error) |
 | `scipy.integrate.quad`, `quadax.quadgk`, an integral to a tolerance inside a jitted model | `integrix.adapt.GaussKronrod` (an `Integral` with `error` and `converged`) |
 | An endpoint singularity, an infinite limit, `quadax.quadts`, `scipy.integrate.romberg` | `integrix.adapt.TanhSinh`, `Romberg`; `cumulative_adaptive` for ∫ to each node |
 | `jnp.trapezoid`, `np.trapz`, `jnp.sum(w * f)`, a weighted mean over a band | `integrix.rule.integrate` and `weighted_mean`, with a functax rule or a weights array |

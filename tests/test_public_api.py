@@ -21,6 +21,7 @@ SUBMODULES = [
     "adapt",
     "adjoint",
     "exceptions",
+    "expect",
     "march",
     "rule",
     "scan",
