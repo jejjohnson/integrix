@@ -6,4 +6,6 @@ For a model with a stiff term, `imex_solver` returns diffrax's `KenCarp3` with a
 
 The steppers moved in from finitevolX at `82090a3`, and the IMEX solver and step control from sesmax-core at `f08f59d`, with their interfaces unchanged; the source libraries' tests run against them (gate G1-port).
 
+The theory is in the [Marches](../marches/) chapter of the mathematical reference.
+
 ::: integrix.march

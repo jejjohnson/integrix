@@ -44,6 +44,11 @@ project:
             - file: theory/02_weighted_summation.md
             - file: theory/03_global_and_local.md
             - file: theory/04_bases_and_stencils.md
+        - title: Operations
+          children:
+            - file: theory/05_rules.md
+            - file: theory/06_scans.md
+            - file: theory/07_marches.md
         - title: Reference
           children:
             - file: theory/notation.md

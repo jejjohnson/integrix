@@ -4,6 +4,7 @@ Every number quoted in `docs/theory/` comes from a ``python`` block on the page.
 A block followed by a ``text`` block must print exactly that text. Each page runs
 in its own interpreter, top to bottom in one namespace, so a page that turns on
 64-bit mode does so for itself only.
+It runs in the slow tier, on main, nightly and on PRs labelled ``ci:full``.
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ def run_blocks(codes: list[str]) -> list[str]:
     return printed
 
 
+# Each page runs JAX in a fresh interpreter (4–26 s), so this is the slow tier.
+@pytest.mark.slow
 @pytest.mark.parametrize("page", PAGES, ids=[page.stem for page in PAGES])
 def test_page_prints_what_it_says(page: Path) -> None:
     blocks = page_blocks(page)
