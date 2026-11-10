@@ -16,6 +16,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 
 | Module | Contents |
 |---|---|
+| [Adaptive quadrature](adapt.md) | `GaussKronrod`: integrals to a tolerance under `jit`, with an error estimate and a custom JVP (Wave 3) |
 | [Adjoints](adjoint.md) | `Checkpointed` and `checkpointed_scan`, `Truncated` and `truncated_scan`, `to_diffrax_adjoint` (Wave 2) |
 | [Marches](march.md) | the diffrax-solver steppers (Euler, Heun, SSP-RK2/3, RK4, SSP-RK(10,4), IMEX-SSP2, AB3), `AbstractStepper` and `run` for AB2, leapfrog-RAF and split-explicit, their step functions, and the matrix-free IMEX solver, its step control and the CFL bound (Wave 1) |
 | [Rules](rule.md) | `Integral`, `integrate`, `weighted_mean`: weights against samples over any axes (Wave 0) |
