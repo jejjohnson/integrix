@@ -6,6 +6,8 @@ Both `integrate` and `weighted_mean` take `where=`, a boolean mask that broadcas
 
 `weighted_mean`'s `weight` may also be a batch of weight functions: the rule's shape with extra leading axes, one mean per leading index, with the values' batch axes first. An instrument's $B$ band responses on $G$ wavelengths reduce $P$ spectra in one call, radiance $(P, G)$ and responses $(B, G)$ giving $(P, B)$.
 
+`log_integrate` is the log-sum-exp twin of `integrate`: it takes $\log f$ and returns $\log I = \log \sum_n w_n f_n$ without leaving log space, so an integrand whose values underflow (a heavy-tailed density far from its mode) still has a finite log-integral. Its weights must be positive, and `where=` drops nodes by making their terms $-\infty$.
+
 The [Spatial integrals](../spatial-integrals/) guide works through the IME, the cross-sectional flux in its strip and sampled forms, and a NaN-propagating column. The theory is in the [Rules](../rules/) chapter of the mathematical reference.
 
 ::: integrix.rule
