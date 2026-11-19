@@ -24,7 +24,7 @@ from functax import quad
 from loguru import logger
 from scipy.special import erf
 
-from integrix import rule
+from integrix import march, rule
 
 
 # The errors below fall to the round-off of float64, so every figure needs it.
@@ -35,7 +35,15 @@ app = App(help="Draw the README's gallery of integrix specimens.")
 # Errors are drawn at no less than this, so an exact result stays on the plot.
 FLOOR = 1e-16
 # One colour per method, the same in every figure.
-COLOURS = {"global": "#B45309", "local": "#2563EB", "reference": "0.35"}
+COLOURS = {
+    "global": "#B45309",
+    "local": "#2563EB",
+    "reference": "0.35",
+    "euler": "#B45309",
+    "heun": "#2563EB",
+    "rk3": "#059669",
+    "rk4": "#7C3AED",
+}
 
 
 def save(fig: plt.Figure, name: str) -> None:
@@ -186,7 +194,86 @@ def convergence_figure() -> None:
     save(fig, "convergence.png")
 
 
-FIGURES = {"convergence": convergence_figure}
+# ---------------------------------------------------------------- order
+
+
+def decay(state: jnp.ndarray) -> jnp.ndarray:
+    """f(y) = −y, whose solution from y(0) = 1 is y(t) = e^(−t)."""
+    return -state
+
+
+def march_to_one(step, n_steps: int) -> float:
+    """y_N after N steps of h = 1 / N from y₀ = 1, with one step function."""
+    size = 1.0 / n_steps
+
+    def body(_, state):
+        # yₙ₊₁ = Φ(yₙ, h)
+        return step(state, decay, size)
+
+    final = jax.lax.fori_loop(0, n_steps, body, jnp.asarray(1.0))
+    return float(final)
+
+
+def order_figure() -> None:
+    """The global error at t = 1 against h, one line per step function."""
+    steppers = {
+        "euler_step": (march.euler_step, 1, COLOURS["euler"]),
+        "heun_step": (march.heun_step, 2, COLOURS["heun"]),
+        "rk3_ssp_step": (march.rk3_ssp_step, 3, COLOURS["rk3"]),
+        "rk4_step": (march.rk4_step, 4, COLOURS["rk4"]),
+    }
+    counts = 2 ** np.arange(1, 11)
+    sizes = 1.0 / counts
+    exact = float(np.exp(-1.0))
+    errors = {}
+    for name, (step, order, _) in steppers.items():
+        sweep = [abs(march_to_one(step, int(n)) - exact) for n in counts]
+        errors[name] = np.maximum(np.array(sweep), FLOOR)
+        # fit only above round-off
+        kept = errors[name] > 1e-13
+        fitted = slope(sizes[kept], errors[name][kept])
+        logger.info(
+            "order: {} (order {}), slope {:.2f} over {} step sizes, error {:.1e} "
+            "at h = 1/1024",
+            name,
+            order,
+            fitted,
+            int(kept.sum()),
+            errors[name][-1],
+        )
+
+    fig, top = headed(
+        "integrix: each step function converges at its order",
+        "The global error |y_N − e⁻¹| at t = 1 for dy/dt = −y, y(0) = 1, after "
+        "N = 1/h steps of each march step function,\nwith h halved from 1/2 to "
+        "1/1024. Dashed lines are hᵖ for p = 1 to 4, through each method's "
+        "coarsest point.",
+        (9, 4.6),
+    )
+    ax = fig.subplots()
+    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.12, top=top - 0.06)
+    for name, (_, order, colour) in steppers.items():
+        ax.loglog(
+            sizes,
+            errors[name],
+            "o-",
+            color=colour,
+            markersize=3.5,
+            linewidth=1.4,
+            label=f"{name} (order {order})",
+        )
+        # C hᵖ through the coarsest point
+        reference = errors[name][0] * (sizes / sizes[0]) ** order
+        ax.loglog(sizes, reference, "--", color=colour, linewidth=0.8, alpha=0.6)
+    ax.set_xlabel("step h", fontsize=9)
+    ax.set_ylabel(r"error $|y_N - e^{-1}|$", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.grid(True, which="major", linewidth=0.3, alpha=0.5)
+    ax.legend(fontsize=8, frameon=False, loc="lower right")
+    save(fig, "order.png")
+
+
+FIGURES = {"convergence": convergence_figure, "order": order_figure}
 
 
 @app.default
@@ -194,7 +281,7 @@ def main(*, only: list[str] | None = None) -> None:
     """Draw every figure of the gallery, or only the ones named.
 
     Args:
-        only: Names from the gallery: convergence.
+        only: Names from the gallery: convergence and order.
     """
     for name in only or FIGURES:
         FIGURES[name]()
