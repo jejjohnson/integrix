@@ -24,7 +24,7 @@ from functax import quad
 from loguru import logger
 from scipy.special import erf
 
-from integrix import expect, march, rule
+from integrix import adapt, expect, march, rule
 
 
 # The errors below fall to the round-off of float64, so every figure needs it.
@@ -45,6 +45,9 @@ COLOURS = {
     "rk4": "#7C3AED",
     "monte_carlo": "#B45309",
     "qmc": "#2563EB",
+    "GaussKronrod": "#B45309",
+    "TanhSinh": "#2563EB",
+    "Romberg": "#059669",
 }
 
 
@@ -384,10 +387,121 @@ def expectation_figure() -> None:
     save(fig, "expectations.png")
 
 
+# ---------------------------------------------------------------- adaptive
+
+
+def root(x: jnp.ndarray) -> jnp.ndarray:
+    """f(x) = √x, whose derivative is singular at 0; ∫₀¹ f = 2/3."""
+    return jnp.sqrt(x)
+
+
+def lorentzian(x: jnp.ndarray) -> jnp.ndarray:
+    """f(x) = 1 / (ω² + (x − 0.3)²) with ω = 0.01, a sharp peak at 0.3."""
+    return 1.0 / (1e-4 + (x - 0.3) ** 2)
+
+
+def adaptive_figure() -> None:
+    """The error each adaptive rule reaches against the tolerance it was given."""
+    integrands = {
+        "root": (root, 2.0 / 3.0, "an endpoint singularity: √x"),
+        # (arctan(0.7 / ω) + arctan(0.3 / ω)) / ω
+        "peak": (
+            lorentzian,
+            float((np.arctan(70.0) + np.arctan(30.0)) / 0.01),
+            "a sharp peak: 1 / (0.01² + (x − 0.3)²)",
+        ),
+    }
+    rules = {
+        "GaussKronrod": adapt.GaussKronrod,
+        "TanhSinh": adapt.TanhSinh,
+        "Romberg": adapt.Romberg,
+    }
+    tolerances = 10.0 ** -np.arange(2, 14)
+    results = {}
+    for integrand_name, (integrand, exact, _) in integrands.items():
+        for rule_name, make_rule in rules.items():
+            errors, converged = [], []
+            for tolerance in tolerances:
+                # Î to rtol, with every other setting at its default
+                result = make_rule(rtol=float(tolerance))(integrand, 0.0, 1.0)
+                errors.append(abs(float(result.value) / exact - 1.0))
+                converged.append(bool(result.converged))
+            results[integrand_name, rule_name] = (
+                np.maximum(np.array(errors), FLOOR),
+                np.array(converged),
+            )
+            met = np.array(errors) <= tolerances
+            # a flag of True on a tolerance that was missed would be a false claim
+            false_claims = np.array(converged) & ~met
+            logger.info(
+                "adaptive: {} on {}: met the tolerance {} of {} times, flagged "
+                "converged {} times, {} false claims, smallest error {:.1e}",
+                rule_name,
+                integrand_name,
+                int(met.sum()),
+                len(tolerances),
+                int(np.sum(converged)),
+                int(false_claims.sum()),
+                min(errors),
+            )
+
+    fig, top = headed(
+        "integrix: each adaptive rule says when it has reached its tolerance",
+        "adapt.GaussKronrod, TanhSinh and Romberg on [0, 1] at their default "
+        "settings, against the rtol each was given. Below the dashed\nline the "
+        "tolerance was met; open markers are converged=False. Errors below "
+        "10⁻¹⁶ are drawn at 10⁻¹⁶.",
+        (10, 4.2),
+    )
+    axes = fig.subplots(1, 2, sharey=True)
+    fig.subplots_adjust(left=0.08, right=0.98, bottom=0.13, top=top - 0.07, wspace=0.08)
+    for ax, (integrand_name, (_, _, title)) in zip(
+        axes, integrands.items(), strict=True
+    ):
+        ax.loglog(
+            tolerances,
+            tolerances,
+            "--",
+            color=COLOURS["reference"],
+            linewidth=1,
+            label="error = rtol",
+        )
+        for rule_name in rules:
+            errors, converged = results[integrand_name, rule_name]
+            colour = COLOURS[rule_name]
+            ax.loglog(tolerances, errors, "-", color=colour, linewidth=1.2)
+            ax.loglog(
+                tolerances[converged],
+                errors[converged],
+                "o",
+                color=colour,
+                markersize=4.5,
+                label=rule_name,
+            )
+            ax.loglog(
+                tolerances[~converged],
+                errors[~converged],
+                "o",
+                markerfacecolor="white",
+                markeredgecolor=colour,
+                markersize=4.5,
+            )
+        ax.invert_xaxis()
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("requested rtol", fontsize=9)
+        ax.tick_params(labelsize=8)
+        ax.grid(True, which="major", linewidth=0.3, alpha=0.5)
+    axes[0].set_ylabel(r"relative error $|\hat{I} / I - 1|$", fontsize=9)
+    # the lower left of the peak's panel is the one corner no curve crosses
+    axes[1].legend(fontsize=8, frameon=False, loc="lower left")
+    save(fig, "adaptive.png")
+
+
 FIGURES = {
     "convergence": convergence_figure,
     "order": order_figure,
     "expectations": expectation_figure,
+    "adaptive": adaptive_figure,
 }
 
 
@@ -396,7 +510,8 @@ def main(*, only: list[str] | None = None) -> None:
     """Draw every figure of the gallery, or only the ones named.
 
     Args:
-        only: Names from the gallery: convergence, order and expectations.
+        only: Names from the gallery: convergence, order, expectations and
+            adaptive.
     """
     for name in only or FIGURES:
         FIGURES[name]()
