@@ -42,6 +42,8 @@ jax.config.update("jax_enable_x64", True)
 import einx
 import jax.numpy as jnp
 import numpy as np
+from functax import quad
+from functax.geometry import AffineGrid
 from integrix import rule
 
 # Shapes: N_z = 20 layers; N_y = 30 rows; N_x = 40 columns of 10 km
@@ -188,11 +190,14 @@ neighbours = west + east + south + north                          # → (N_y, N_
 diffusion = diffusivity * (neighbours - 4.0 * column) / cell**2   # → (N_y, N_x)
 # ∂Ω/∂t = −U ∂Ω/∂x + K ∇²Ω + S, cell by cell
 tendency = advection + diffusion + source                         # → (N_y, N_x)
-# ΔA_ij = Δx²
-cell_area = jnp.full((n_rows, n_cols), cell**2)                   # → (N_y, N_x)
+# the domain's grid: Δx cells from the origin
+domain = AffineGrid([cell, 0.0, 0.0, 0.0, cell, 0.0], (n_rows, n_cols))
+# today (functax)
+# ΔA_ij = Δx², in the grid's shape
+cells = quad.cell_area(domain)                                    # → (N_y, N_x)
 # today (integrix)
 # dM/dt = ∑ᵢⱼ (∂Ω/∂t)ᵢⱼ ΔA
-mass_change = rule.integrate(cell_area, tendency, axis=(0, 1))
+mass_change = rule.integrate(cells, tendency, axis=(0, 1))
 # outward flux through each edge: advection leaves through the east edge only,
 # diffusion through all four (K Ω / Δx against the zero outside)
 # Δℓ along the east and west edges
@@ -254,22 +259,21 @@ for degrees in (5.0, 1.0):
     centres = 0.5 * (edges[1:] + edges[:-1])                      # → (N_φ,)
     # Δϑ = 2π / N_ϑ
     step = 2.0 * jnp.pi / n_lon                                   # → ()
-    # sin φⱼ₊½
-    sin_edges = jnp.sin(edges)                                    # → (N_φ + 1,)
-    # δⱼ = sin φⱼ₊½ − sin φⱼ₋½
-    sin_steps = jnp.diff(sin_edges)                               # → (N_φ,)
+    # a global north-up grid of δ° cells
+    globe = AffineGrid([degrees, 0.0, -180.0, 0.0, -degrees, 90.0], (n_lat, n_lon))
+    # today (functax)
     # ΔA = R² Δϑ (sin φⱼ₊½ − sin φⱼ₋½)
-    exact_areas = radius**2 * step * sin_steps                    # → (N_φ,)
+    exact_areas = quad.cell_area(                                 # → (N_φ, N_ϑ)
+        globe, sphere_radius=radius, unit="degrees"
+    ).weights
     # cos φⱼ
     cos_centres = jnp.cos(centres)                                # → (N_φ,)
     # Δφ
     lat_step = edges[1] - edges[0]                                # → ()
     # ΔA ≈ R² cos φⱼ Δφ Δϑ
     midpoint_areas = radius**2 * step * cos_centres * lat_step    # → (N_φ,)
-    # ∑ⱼ ΔAⱼ
-    exact_sum = jnp.sum(exact_areas)                              # → ()
-    # A = N_ϑ ∑ⱼ ΔAⱼ
-    exact_total = n_lon * float(exact_sum)
+    # A = ∑ⱼₖ ΔAⱼₖ
+    exact_total = float(jnp.sum(exact_areas))
     # ∑ⱼ ΔAⱼ
     midpoint_sum = jnp.sum(midpoint_areas)                        # → ()
     # A ≈ N_ϑ ∑ⱼ ΔAⱼ
@@ -281,7 +285,7 @@ for degrees in (5.0, 1.0):
 ```
 
 ```text
-5 deg: exact areas +2.2e-16, cos(phi) areas +3.2e-04
+5 deg: exact areas -2.4e-15, cos(phi) areas +3.2e-04
 1 deg: exact areas +2.2e-16, cos(phi) areas +1.3e-05
 ```
 

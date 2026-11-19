@@ -19,6 +19,7 @@ import einx
 import jax.numpy as jnp
 import numpy as np
 from functax import quad
+from functax.geometry import AffineGrid
 from integrix import rule
 from jaxtyping import Array, Float
 
@@ -63,13 +64,16 @@ draws = rng.uniform(size=(60, 100))                                 # → (N_y, 
 clouds = jnp.asarray(draws < 0.1)                                   # → (N_y, N_x)
 # Ω̃ = NaN under a cloud, Ω elsewhere
 cloudy = jnp.where(clouds, jnp.nan, enhancement)                    # → (N_y, N_x)
-# ΔA = Δx², in m²
-pixel_area = jnp.full((60, 100), pixel**2)                          # → (N_y, N_x)
+# the image's grid: x = Δx (j + ½), y = −600 + Δx (i + ½), in m
+scene = AffineGrid([pixel, 0.0, 0.0, 0.0, pixel, -600.0], (60, 100))
+# today (functax)
+# ΔAᵢⱼ = Δx², in m², in the image's shape
+pixels = quad.cell_area(scene)                                      # → (N_y, N_x)
 ```
 
 ## The integrated mass enhancement
 
-The integrated mass enhancement (IME) is the mass in the plume, $\mathrm{IME} = \int_P \Omega \mathrm{d}A \approx \sum_{i \in P} \Omega_i \Delta A_i$ over the pixels $P$ of a plume mask. The weights are the pixel areas, kept in the image's shape, and the mask and the clouds go in as arguments. With `nan_policy="omit"` the cloudy pixels are left out, which is `np.nansum` over the mask, but traceable and differentiable.
+The integrated mass enhancement (IME) is the mass in the plume, $\mathrm{IME} = \int_P \Omega \mathrm{d}A \approx \sum_{i \in P} \Omega_i \Delta A_i$ over the pixels $P$ of a plume mask. The weights are the pixel areas from `functax.quad.cell_area`, which keeps them in the image's shape, and the mask and the clouds go in as arguments. With `nan_policy="omit"` the cloudy pixels are left out, which is `np.nansum` over the mask, but traceable and differentiable.
 
 ```python
 # Shapes: N_y = 60 rows; N_x = 100 columns; N_P pixels in the plume mask
@@ -78,18 +82,18 @@ in_plume = enhancement > 1e-5                                 # → (N_y, N_x)
 # today (integrix)
 # IME = ∑ over P of Ωᵢ ΔAᵢ, cloudy pixels left out
 ime = rule.integrate(                                         # → ()
-    pixel_area, cloudy, axis=(0, 1), where=in_plume, nan_policy="omit"
+    pixels, cloudy, axis=(0, 1), where=in_plume, nan_policy="omit"
 ).value
 # Ωᵢ on the plume pixels, as a NumPy array
 masked_field = np.asarray(cloudy)[in_plume]                   # → (N_P,)
 # ΔAᵢ on the plume pixels, as a NumPy array
-masked_area = np.asarray(pixel_area)[in_plume]                # → (N_P,)
+masked_area = np.asarray(pixels.weights)[in_plume]            # → (N_P,)
 # IME = ∑ over P of Ωᵢ ΔAᵢ, skipping NaN
 check = np.nansum(masked_field * masked_area)                 # → ()
 # today (integrix)
 # IME = ∑ over P of Ωᵢ ΔAᵢ, clear sky
 clear = rule.integrate(                                       # → ()
-    pixel_area, enhancement, axis=(0, 1), where=in_plume
+    pixels, enhancement, axis=(0, 1), where=in_plume
 ).value
 print(
     f"IME {float(ime):.2f} kg (np.nansum {check:.2f}), clear sky {float(clear):.2f} kg"
@@ -97,7 +101,7 @@ print(
 # today (integrix)
 # IME = ∑ over P of Ωᵢ ΔAᵢ, NaN propagated
 propagated = rule.integrate(                                  # → ()
-    pixel_area, cloudy, axis=(0, 1), where=in_plume
+    pixels, cloudy, axis=(0, 1), where=in_plume
 ).value
 print(f"with the default nan_policy: {float(propagated)}")
 ```
@@ -121,7 +125,7 @@ def plume_mass(field: Float[Array, "row col"]) -> Float[Array, ""]:
     # today (integrix)
     # IME = ∑ over P of Ωᵢ ΔAᵢ, cloudy pixels left out
     mass = rule.integrate(                                    # → ()
-        pixel_area, field, axis=(0, 1), where=in_plume, nan_policy="omit"
+        pixels, field, axis=(0, 1), where=in_plume, nan_policy="omit"
     ).value
     return mass
 
@@ -164,7 +168,7 @@ for name, field, policy in cases:
     # today (integrix)
     # IME_S = ∑ over S of Ωᵢ ΔAᵢ
     strip_mass = rule.integrate(                              # → ()
-        pixel_area, field, axis=(0, 1), where=in_strip, nan_policy=policy
+        pixels, field, axis=(0, 1), where=in_strip, nan_policy=policy
     ).value
     # Φ ≈ (U / w) IME_S
     flux = wind * float(strip_mass) / strip_width

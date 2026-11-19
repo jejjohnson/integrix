@@ -103,6 +103,22 @@ class TestMatchesScipy:
         from_tensor = integrate((y_rule, x_rule), field).value
         assert_matches_scipy(from_areas, from_tensor, rtol=1e-14)
 
+    def test_functax_cell_areas_meet_an_image_cell_by_cell(self) -> None:
+        # functax's cell_area keeps the grid's shape (integrix#47, Decision 10)
+        from functax.geometry import AffineGrid, Axis, RectilinearGrid
+        from functax.quad import cell_area
+
+        pixels = cell_area(AffineGrid([20.0, 0.0, 0.0, 0.0, -20.0, 0.0], (5, 4)))
+        field = jax.random.normal(jax.random.key(4), (5, 4))
+        actual = integrate(pixels, field).value
+        reference = 400.0 * jnp.sum(field)
+        assert_matches_scipy(actual, reference, rtol=1e-14)
+        # a (λ, φ) grid against a (φ, λ) field is a shape error, not a wrong sum
+        axes = (Axis(jnp.arange(0.5, 4.0)), Axis(jnp.arange(0.5, 5.0)))
+        globe = cell_area(RectilinearGrid(axes), sphere_radius=1.0, unit="degrees")
+        with pytest.raises((ix.ValidationError, TypeCheckError), match="values"):
+            integrate(globe, field)
+
     def test_axes_need_not_be_adjacent_or_ordered(self) -> None:
         y_rule = trapezoid_rule(_random_nodes(3, seed=7))
         x_rule = trapezoid_rule(_random_nodes(5, seed=8))

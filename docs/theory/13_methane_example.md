@@ -41,6 +41,7 @@ import einx
 import jax.numpy as jnp
 import numpy as np
 from functax import quad
+from functax.geometry import AffineGrid
 from integrix import adjoint, expect, march, rule, scan
 from jaxtyping import Array, Float, PRNGKeyArray
 
@@ -213,12 +214,15 @@ limit = march.stable_step(                                        # → ()
 )
 # Ω(T) = march of ∂Ω/∂t
 column = plume(wind)                                              # → (N_y, N_x)
-# ΔA = Δx²
-pixel_area = jnp.full((n_rows, n_cols), spacing**2)               # → (N_y, N_x)
+# the image's grid: Δx pixels from the origin
+scene = AffineGrid([spacing, 0.0, 0.0, 0.0, spacing, 0.0], (n_rows, n_cols))
+# today (functax)
+# ΔAᵢⱼ = Δx², in the image's shape
+pixels = quad.cell_area(scene)                                    # → (N_y, N_x)
 # today (integrix)
 # M = ∑ Ωᵢⱼ Δx²
 plume_mass = rule.integrate(                                      # → ()
-    pixel_area, column, axis=(0, 1)
+    pixels, column, axis=(0, 1)
 ).value
 # τ = (N_x − 4) Δx / U: the time to cross from the source to the east edge
 residence = (n_cols - 4) * spacing / wind
@@ -304,7 +308,7 @@ in_plume = retrieved > 3.0 * column_noise                         # → (N_y, N_
 # today (integrix)
 # IME = ∑ over P of Ω̂ᵢⱼ Δx²
 ime = rule.integrate(                                             # → ()
-    pixel_area, retrieved, axis=(0, 1), where=in_plume
+    pixels, retrieved, axis=(0, 1), where=in_plume
 ).value
 # pₓ = any over y of Pᵢₓ
 plume_in_column = einx.any("y x -> x", in_plume)                  # → (N_x,)
@@ -359,7 +363,7 @@ def domain_mass(wind_speed: float, adjoint_option: Any) -> Float[Array, ""]:
     final = plume(wind_speed, adjoint_option)                     # → (N_y, N_x)
     # today (integrix)
     # M = ∑ Ωᵢⱼ Δx²
-    mass = rule.integrate(pixel_area, final, axis=(0, 1)).value   # → ()
+    mass = rule.integrate(pixels, final, axis=(0, 1)).value       # → ()
     return mass
 
 
