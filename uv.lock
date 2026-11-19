@@ -544,8 +544,8 @@ wheels = [
 
 [[package]]
 name = "functax"
-version = "0.0.6"
-source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.6#7fdcd2729fe8d6a62de0ab2330ae6ae2da133ea2" }
+version = "0.0.11"
+source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.11#4889ce196b4594839cf4bc472f6f731da641191b" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -761,7 +761,7 @@ requires-dist = [
     { name = "diffrax", specifier = ">=0.7.2,<0.8" },
     { name = "einx", specifier = ">=0.4.3" },
     { name = "equinox", specifier = ">=0.13.8" },
-    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.6" },
+    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.11" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12" },
     { name = "jax", specifier = ">=0.10" },
     { name = "jaxlib", specifier = ">=0.10" },
