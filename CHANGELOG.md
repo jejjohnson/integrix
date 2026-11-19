@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/jejjohnson/integrix/compare/v0.0.6...v0.0.7) (2026-11-19)
+
+
+### Features
+
+* **plugins:** a Claude Code plugin with a skill shelf and contract cards for integrix ([#85](https://github.com/jejjohnson/integrix/issues/85)) ([d42d485](https://github.com/jejjohnson/integrix/commit/d42d4856012108a906f631e3f11b28e8b2f93c3b))
+
 ## [0.0.6](https://github.com/jejjohnson/integrix/compare/v0.0.5...v0.0.6) (2026-11-19)
 
 
