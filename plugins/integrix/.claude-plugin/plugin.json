@@ -1,0 +1,10 @@
+{
+  "name": "integrix",
+  "description": "Write integration in JAX on integrix — sums against a quadrature rule over one axis or several, band-weighted means, log-integrals, running integrals, adaptive Gauss–Kronrod, tanh–sinh and Romberg quadrature, Monte Carlo, quasi-Monte Carlo and importance-sampling expectations, fixed-step and IMEX time steppers that extend diffrax, and checkpointed or truncated adjoints — instead of re-implementing them with trapz, scipy.integrate and hand-written loops.",
+  "author": {
+    "name": "jejjohnson"
+  },
+  "repository": "https://github.com/jejjohnson/integrix",
+  "license": "MIT",
+  "keywords": ["jax", "quadrature", "integration", "time-stepping", "diffrax", "monte-carlo", "adjoint", "equinox"]
+}

@@ -1,0 +1,159 @@
+# integrix's shelf: its modules, its listed skills, its units and its entries.
+#
+# Every public name of every module below belongs to exactly one entry (gate
+# SH-1), and the entry's file names it. scripts/skill_shelf.py writes the
+# generated parts of the two SKILL.md files from this file and checks the gates.
+
+# Where the public names are read from: module = its file, from the root.
+[modules]
+"integrix" = "src/integrix/__init__.py"
+"integrix.exceptions" = "src/integrix/exceptions.py"
+"integrix.rule" = "src/integrix/rule.py"
+"integrix.scan" = "src/integrix/scan.py"
+"integrix.adapt" = "src/integrix/adapt.py"
+"integrix.expect" = "src/integrix/expect.py"
+"integrix.march" = "src/integrix/march.py"
+"integrix.adjoint" = "src/integrix/adjoint.py"
+
+[skills.quadrature-and-expectations-with-integrix]
+builds_on_units = []
+
+[skills.time-stepping-with-integrix]
+builds_on_units = []
+
+[units.integrals]
+title = "Integrals"
+rungs = "⓪ ① ②"
+skill = "quadrature-and-expectations-with-integrix"
+
+[units.marches]
+title = "Marches"
+rungs = "① ② ④"
+skill = "time-stepping-with-integrix"
+
+[[entries]]
+file = "rules-and-weights"
+title = "Sums against a rule"
+role = "primitive"
+unit = "integrals"
+skill = "quadrature-and-expectations-with-integrix"
+covers = "an integral as weights against samples over one axis or several, the mean under a weight function, the log-integral, and the result they return"
+names = [
+    "integrix.rule.Integral", "integrix.rule.integrate",
+    "integrix.rule.log_integrate", "integrix.rule.weighted_mean",
+]
+
+[[entries]]
+file = "running-integrals"
+title = "Running integrals"
+role = "primitive"
+unit = "integrals"
+skill = "quadrature-and-expectations-with-integrix"
+covers = "the cumulative integral along one axis, from either end, from samples or from an integrand to a tolerance"
+names = ["integrix.scan.cumulative", "integrix.adapt.cumulative_adaptive"]
+
+[[entries]]
+file = "adaptive-quadrature"
+title = "Adaptive quadrature"
+role = "strategy"
+unit = "integrals"
+skill = "quadrature-and-expectations-with-integrix"
+covers = "an integrand integrated to a tolerance with an error estimate: peaked, smooth, singular at an end, or on an infinite interval"
+names = [
+    "integrix.adapt.GaussKronrod", "integrix.adapt.Romberg",
+    "integrix.adapt.TanhSinh",
+]
+
+[[entries]]
+file = "expectations"
+title = "Expectations"
+role = "strategy"
+unit = "integrals"
+skill = "quadrature-and-expectations-with-integrix"
+covers = "an expectation with its standard error by Monte Carlo, quasi-Monte Carlo or importance sampling, the diagnostics of importance weights, and log-expectations of heavy-tailed integrands"
+names = [
+    "integrix.expect.Expectation", "integrix.expect.effective_sample_size",
+    "integrix.expect.importance", "integrix.expect.log_gauss_hermite",
+    "integrix.expect.log_simpson", "integrix.expect.monte_carlo",
+    "integrix.expect.pareto_smoothed_log_weights", "integrix.expect.qmc",
+]
+
+[[entries]]
+file = "errors-and-installs"
+title = "Errors, the version and what to install"
+role = "setup"
+unit = "integrals"
+skill = "quadrature-and-expectations-with-integrix"
+covers = "the two exceptions, which checks still run under jit, the version string and the packages integrix brings with it"
+names = [
+    "integrix.IntegrixError", "integrix.ValidationError",
+    "integrix.__version__", "integrix.exceptions.IntegrixError",
+    "integrix.exceptions.ValidationError",
+]
+
+[[entries]]
+file = "run-and-steppers"
+title = "The march and its history steppers"
+role = "algorithm"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "N constant steps of any stepper, the base class of a scheme that carries history, and the three that ship: AB2, filtered leapfrog and split-explicit"
+names = [
+    "integrix.march.AB2Solver", "integrix.march.AbstractStepper",
+    "integrix.march.LeapfrogRAFSolver", "integrix.march.SplitExplicitRKSolver",
+    "integrix.march.SplitExplicitTerms", "integrix.march.run",
+]
+
+[[entries]]
+file = "diffrax-solvers"
+title = "Single-step schemes as diffrax solvers"
+role = "strategy"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "forward Euler, Heun, the SSP Runge–Kutta schemes, classical RK4 and AB3, each a diffrax solver for diffeqsolve or for the march"
+names = [
+    "integrix.march.AB3Solver", "integrix.march.ForwardEulerDfx",
+    "integrix.march.RK2Heun", "integrix.march.RK3SSP",
+    "integrix.march.RK4Classic", "integrix.march.SSP_RK104",
+    "integrix.march.SSP_RK2",
+]
+
+[[entries]]
+file = "imex-and-step-control"
+title = "IMEX schemes and the stable step"
+role = "strategy"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller and the explicit CFL bound"
+names = [
+    "integrix.march.IMEX_SSP2", "integrix.march.imex_solver",
+    "integrix.march.imex_ssp2_step", "integrix.march.imex_stepsize_controller",
+    "integrix.march.stable_step",
+]
+
+[[entries]]
+file = "step-functions"
+title = "Pure step functions"
+role = "primitive"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "one step of each explicit scheme for an autonomous right-hand side, to put inside your own scan"
+names = [
+    "integrix.march.ab2_step", "integrix.march.ab3_step",
+    "integrix.march.euler_step", "integrix.march.heun_step",
+    "integrix.march.leapfrog_raf_step", "integrix.march.rk3_ssp_step",
+    "integrix.march.rk4_step", "integrix.march.split_explicit_step",
+]
+
+[[entries]]
+file = "adjoints"
+title = "Adjoints through a march"
+role = "strategy"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "the exact gradient in less memory by checkpointing, a gradient cut to the last k steps, their scan forms, and the bridge to a diffrax adjoint"
+names = [
+    "integrix.adjoint.Checkpointed", "integrix.adjoint.Truncated",
+    "integrix.adjoint.checkpointed_scan", "integrix.adjoint.to_diffrax_adjoint",
+    "integrix.adjoint.truncated_scan",
+]
