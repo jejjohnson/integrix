@@ -30,10 +30,10 @@ dependencies = [
     # The steppers subclass diffrax's solver protocol, so the minor version is
     # pinned and moves only with a run of every stepper's tests.
     "diffrax>=0.7.2,<0.8",
-    # Unpublished siblings resolve from git, by tag. functax 0.0.6 is the first
-    # release with functax.quad's Rule, 1-D rules and curve rules (functax#44,
-    # functax#81), which integrix sums with.
-    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.6",
+    # Unpublished siblings resolve from git, by tag. functax 0.0.11 is the first
+    # release whose cell_area keeps the grid's shape (functax#148), on top of the
+    # Rule, 1-D rules and curve rules (functax#44, functax#81) integrix sums with.
+    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.11",
     "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.12",
 ]
 

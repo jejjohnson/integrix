@@ -172,7 +172,7 @@ current).
 
 <!-- upstream -->
 
-Listed at jax 0.12.0.1, equinox 0.13.8, diffrax 0.7.2, lineax 0.1.1, optimistix 0.1.0, einx 0.4.3, functax 0.0.6, gaussx 0.6.12.
+Listed at jax 0.12.0.1, equinox 0.13.8, diffrax 0.7.2, lineax 0.1.1, optimistix 0.1.0, einx 0.4.3, functax 0.0.11, gaussx 0.6.12.
 
 ## Upstream: `jax`
 
@@ -681,7 +681,7 @@ quadrature rules (nodes and weights) that integrix sums with
 |---|---|---|
 | `FunctaxError` | class | Base class for every exception raised by ``functax``. |
 | `GeometryError` | class | Raised when an axis, grid or point set is malformed. |
-| `MissingExtraError` | class | Raised when a module needs the ``functax[jax]`` extra and it is missing. |
+| `MissingExtraError` | class | Raised when a module or a plan needs an optional extra that is missing. |
 | `NonlinearSchemeError` | class | Raised when a linear-only operation meets a plan whose fit is nonlinear in y. |
 | `OutsideDomainError` | class | Raised under ``outside="raise"`` when a target lies outside the domain. |
 | `PolicyError` | class | Raised when an interpolation policy names an option that does not exist. |
