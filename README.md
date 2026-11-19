@@ -28,7 +28,7 @@
 
 ---
 
-A band radiance, the mass of a plume over an image, the optical depth down to every level of a column and the state of an ocean model after ten days of stepping are all integrals. Each library of the stack used to write its own (a trapezoid sum here, a cumulative sum of increments there, a Runge–Kutta loop somewhere else), so integrix treats them as one object,
+A band radiance, the mass of a plume over an image, the optical depth down to every level of a column and the state of an ocean model after ten days of stepping are all integrals. Each library of the stack used to write its own (a trapezoid sum here, a cumulative sum of increments there, a Runge–Kutta loop somewhere else), so in integrix we treat them as one object,
 
 ```math
 I[f] = \int_\Omega f(\mathbf{s}) \mathrm{d}\mu(\mathbf{s})
@@ -246,7 +246,7 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 | `integrix.march` | `run`, `AbstractStepper`, `AB2Solver`, `LeapfrogRAFSolver`, `SplitExplicitRKSolver`, `SplitExplicitTerms`, `ForwardEulerDfx`, `RK2Heun`, `SSP_RK2`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `AB3Solver`, `IMEX_SSP2`, `imex_solver`, `imex_stepsize_controller`, `stable_step`, `euler_step`, `heun_step`, `rk3_ssp_step`, `rk4_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`, `split_explicit_step`, `imex_ssp2_step` | The single-step schemes and AB3 subclass diffrax's solvers; AB2, leapfrog and split-explicit are `AbstractStepper`s that `run` loops with `lax.scan`; each `*_step` function is one step on arrays |
 | `integrix.adapt` | `GaussKronrod`, `TanhSinh`, `Romberg`, `cumulative_adaptive` | To a tolerance, with an error estimate and a `converged` flag |
 | `integrix.adjoint` | `Checkpointed`, `Truncated`, `checkpointed_scan`, `truncated_scan`, `to_diffrax_adjoint` | Passed to `march.run` as `adjoint=`, or around any `lax.scan`; `to_diffrax_adjoint` maps a pipekit-cycle adjoint spec onto a diffrax adjoint |
-| `integrix.expect` | `Expectation`, `monte_carlo`, `qmc`, `importance`, `effective_sample_size`, `pareto_smoothed_log_weights`, `log_gauss_hermite`, `log_simpson` | Sampled expectations with a standard error, the diagnostics of importance weights, and two rules that stay in log space: a lognormal expectation by Gauss–Hermite, and Simpson on a grid in log q |
+| `integrix.expect` | `Expectation`, `monte_carlo`, `qmc`, `importance`, `effective_sample_size`, `pareto_smoothed_log_weights`, `log_gauss_hermite`, `log_simpson` | Sampled expectations with a standard error, the diagnostics of importance weights, and two rules that stay in log space: a lognormal expectation by Gauss–Hermite, and Simpson on a logarithmic grid |
 | `integrix` | `IntegrixError`, `ValidationError`, `__version__` | Every error derives from `IntegrixError`; `ValidationError` is also a `ValueError` |
 
 ## 📖 Documentation
