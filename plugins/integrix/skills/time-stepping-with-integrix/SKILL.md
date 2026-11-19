@@ -105,6 +105,13 @@ Each entry is one file with the names it covers, a worked example and the rules.
 Open the one the task needs; do not read them all.
 
 <!-- shelf:begin -->
+| Role | Entry | Covers | Names |
+|---|---|---|---|
+| ④ algorithm | [The march and its history steppers](shelf/run-and-steppers.md) | N constant steps of any stepper, the base class of a scheme that carries history, and the three that ship: AB2, filtered leapfrog and split-explicit | 6 |
+| ② strategy | [Single-step schemes as diffrax solvers](shelf/diffrax-solvers.md) | forward Euler, Heun, the SSP Runge–Kutta schemes, classical RK4 and AB3, each a diffrax solver for diffeqsolve or for the march | 7 |
+| ② strategy | [IMEX schemes and the stable step](shelf/imex-and-step-control.md) | a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller and the explicit CFL bound | 5 |
+| ① primitive | [Pure step functions](shelf/step-functions.md) | one step of each explicit scheme for an autonomous right-hand side, to put inside your own scan | 8 |
+| ② strategy | [Adjoints through a march](shelf/adjoints.md) | the exact gradient in less memory by checkpointing, a gradient cut to the last k steps, their scan forms, and the bridge to a diffrax adjoint | 5 |
 <!-- shelf:end -->
 
 ## Before you finish

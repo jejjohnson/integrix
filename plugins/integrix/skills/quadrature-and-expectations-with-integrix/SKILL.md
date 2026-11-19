@@ -101,6 +101,13 @@ Each entry is one file with the names it covers, a worked example and the rules.
 Open the one the task needs; do not read them all.
 
 <!-- shelf:begin -->
+| Role | Entry | Covers | Names |
+|---|---|---|---|
+| ① primitive | [Sums against a rule](shelf/rules-and-weights.md) | an integral as weights against samples over one axis or several, the mean under a weight function, the log-integral, and the result they return | 4 |
+| ① primitive | [Running integrals](shelf/running-integrals.md) | the cumulative integral along one axis, from either end, from samples or from an integrand to a tolerance | 2 |
+| ② strategy | [Adaptive quadrature](shelf/adaptive-quadrature.md) | an integrand integrated to a tolerance with an error estimate: peaked, smooth, singular at an end, or on an infinite interval | 3 |
+| ② strategy | [Expectations](shelf/expectations.md) | an expectation with its standard error by Monte Carlo, quasi-Monte Carlo or importance sampling, the diagnostics of importance weights, and log-expectations of heavy-tailed integrands | 8 |
+| setup | [Errors, the version and what to install](shelf/errors-and-installs.md) | the two exceptions, which checks still run under jit, the version string and the packages integrix brings with it | 5 |
 <!-- shelf:end -->
 
 ## Before you finish
