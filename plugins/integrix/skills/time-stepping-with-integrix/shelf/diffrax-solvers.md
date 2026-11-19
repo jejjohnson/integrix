@@ -54,10 +54,17 @@ for solver in (RK2Heun(), SSP_RK2(), RK3SSP(), AB3Solver()):
 for solver in (RK4Classic(), SSP_RK104()):
     assert jnp.allclose(solve(solver, 0.1), exact, rtol=1e-4)
 
-assert [s.order(None) for s in (RK2Heun(), RK3SSP(), RK4Classic(), SSP_RK104())] == [2, 3, 4, 4]
+assert [s.order(None) for s in (RK2Heun(), RK3SSP(), RK4Classic(), SSP_RK104())] == [
+    2,
+    3,
+    4,
+    4,
+]
 
 # the same solver through integrix's march: a number of steps, not an end time
-assert jnp.allclose(run(RK3SSP(), lambda t, y, args: -y, 0.0, y0, 0.01, 100), exact, rtol=1e-3)
+assert jnp.allclose(
+    run(RK3SSP(), lambda t, y, args: -y, 0.0, y0, 0.01, 100), exact, rtol=1e-3
+)
 
 # an adaptive step from Heun's embedded error estimate
 adaptive = dfx.diffeqsolve(

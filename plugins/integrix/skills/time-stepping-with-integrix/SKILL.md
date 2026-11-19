@@ -70,7 +70,14 @@ assert float(final.max()) <= float(tracer0.max()) + 1e-5  # and gains no new max
 
 # every state, for output
 states = run(
-    RK3SSP(), tendency, 0.0, tracer0, dt, n_steps, args=speed, saveat=dfx.SaveAt(steps=True)
+    RK3SSP(),
+    tendency,
+    0.0,
+    tracer0,
+    dt,
+    n_steps,
+    args=speed,
+    saveat=dfx.SaveAt(steps=True),
 )
 assert states.shape == (n_steps, n)
 
@@ -78,7 +85,14 @@ assert states.shape == (n_steps, n)
 # the gradient of a misfit with respect to the initial state, with checkpoints
 def misfit(tracer):
     end = run(
-        RK3SSP(), tendency, 0.0, tracer, dt, n_steps, args=speed, adjoint=Checkpointed(every=8)
+        RK3SSP(),
+        tendency,
+        0.0,
+        tracer,
+        dt,
+        n_steps,
+        args=speed,
+        adjoint=Checkpointed(every=8),
     )
     return 0.5 * jnp.sum((end - final) ** 2)
 

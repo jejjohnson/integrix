@@ -28,7 +28,9 @@ from integrix.rule import integrate
 
 assert integrix.exceptions.ValidationError is ValidationError
 assert integrix.exceptions.IntegrixError is IntegrixError
-assert issubclass(ValidationError, IntegrixError) and issubclass(ValidationError, ValueError)
+assert issubclass(ValidationError, IntegrixError) and issubclass(
+    ValidationError, ValueError
+)
 assert all(part.isdigit() for part in integrix.__version__.split(".")[:3])
 
 # two weights against three samples
