@@ -249,6 +249,22 @@ Each public name sits on one rung of the GeoStack role ladder, by the job it doe
 | `integrix.expect` | `Expectation`, `monte_carlo`, `qmc`, `importance`, `effective_sample_size`, `pareto_smoothed_log_weights`, `log_gauss_hermite`, `log_simpson` | Sampled expectations with a standard error, the diagnostics of importance weights, and two rules that stay in log space: a lognormal expectation by Gauss–Hermite, and Simpson on a logarithmic grid |
 | `integrix` | `IntegrixError`, `ValidationError`, `__version__` | Every error derives from `IntegrixError`; `ValidationError` is also a `ValueError` |
 
+## 🖼️ Gallery
+
+These are measured errors of integrix on integrands with closed forms, drawn by [`docs/assets/readme/figures.py`](docs/assets/readme/figures.py).
+
+A global rule converges spectrally on a smooth field and a local one algebraically, but one kink brings both to $`N^{-2}`$: `rule.integrate` with functax's Gauss–Legendre weights reaches $`10^{-14}`$ on a band of moisture by $`N = 19`$ nodes, and on a sea-ice edge it does no better than the trapezoid rule, which is exact whenever a node falls on the edge.
+
+<p align="center"><img src="docs/assets/readme/convergence.png" alt="Error against the number of nodes for Gauss–Legendre and trapezoid weights: on a smooth band Gauss–Legendre falls to round-off by 19 nodes while the trapezoid rule follows N to the minus 2; on a kinked sea-ice field both follow N to the minus 2" width="100%"></p>
+
+Each step function of `integrix.march` converges at its order: on $`\mathrm{d}y / \mathrm{d}t = -y`$ the fitted slopes of `euler_step`, `heun_step`, `rk3_ssp_step` and `rk4_step` are 1.03, 2.05, 3.05 and 4.07.
+
+<p align="center"><img src="docs/assets/readme/order.png" alt="Global error at t = 1 against the step h for forward Euler, Heun, SSP-RK3 and RK4, on lines of slope 1, 2, 3 and 4" width="100%"></p>
+
+For the same 65,536 evaluations, `expect.qmc` (randomised Sobol points) is 66 times more accurate than `expect.monte_carlo` on a two-dimensional Gaussian expectation, and the standard error each call reports tracks its real error for both.
+
+<p align="center"><img src="docs/assets/readme/expectations.png" alt="RMS error over 20 seeds against the number of evaluations for Monte Carlo and randomised quasi-Monte Carlo, with the reported standard errors as dashed lines that track them; Monte Carlo follows S to the minus one half and quasi-Monte Carlo falls faster" width="100%"></p>
+
 ## 📖 Documentation
 
 - **[Quickstart](https://jejjohnson.github.io/integrix/quickstart/)**: the calling convention, double precision, and a first example of each module.
