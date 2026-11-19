@@ -48,7 +48,7 @@ except ValueError as err:  # a ValidationError is a ValueError
 ## Rules
 
 - Catch `IntegrixError` to trap the package, or `ValueError` in code that must not import integrix.
-- Shapes, axes and configuration are checked when the call is traced or the object is built, so a bad argument fails before the computation runs.
+- Configuration is checked when the object is built: `GaussKronrod(order=17)` raises before any integrand is evaluated.
 - A check on a traced value, such as a positive weight in `log_integrate` or a spacing in `stable_step`, still runs under `jax.jit`.
 - An adaptive rule that misses its tolerance does not raise: it returns `converged=False`.
 - integrix installs JAX, Equinox, diffrax, lineax, optimistix, einx, functax and gaussx with it. SciPy and quadax are test references only, never imported by the library.
