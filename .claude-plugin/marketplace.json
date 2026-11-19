@@ -1,0 +1,14 @@
+{
+  "name": "integrix",
+  "owner": {
+    "name": "jejjohnson"
+  },
+  "description": "Claude Code plugins for integration in JAX with integrix.",
+  "plugins": [
+    {
+      "name": "integrix",
+      "source": "./plugins/integrix",
+      "description": "Use integrix's quadrature against a rule, running integrals, adaptive quadrature with an error estimate, expectations with a standard error, time steppers and checkpointed or truncated adjoints instead of hand-rolled trapz sums, scipy.integrate calls and time loops: two skills (quadrature and expectations, time stepping) and a reuse reviewer."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+- **Provides.** Time stepping in JAX, yₙ₊₁ = Φ(yₙ, tₙ, h): schemes that are diffrax solvers, schemes that carry history, one loop for both, and adjoints through it.
+- **Nouns.** Diffrax solvers `integrix.march.RK4Classic`, `integrix.march.RK3SSP`, `integrix.march.SSP_RK104`, `integrix.march.AB3Solver`, `integrix.march.IMEX_SSP2`; steppers `integrix.march.AB2Solver`, `integrix.march.LeapfrogRAFSolver`, `integrix.march.SplitExplicitRKSolver`.
+- **Verbs.** `integrix.march.run(stepper, rhs, t0, y0, dt, n_steps)` with `rhs(t, y, args)`; `diffrax.diffeqsolve` takes the solvers too; `integrix.march.rk4_step(state, rhs_fn, dt)` and its siblings are single steps for `rhs_fn(y)`; `integrix.march.stable_step` bounds an explicit step.
+- **Adverbs.** `saveat=diffrax.SaveAt(steps=True)` for every state; `adjoint=integrix.adjoint.Checkpointed(every=k)` or `integrix.adjoint.Truncated(k=k)`; `args=` for parameters.
+- **Keep.** The state is any pytree and `n_steps` is a Python integer; write the vector field once as `rhs(t, y, args)` for both kinds of stepper, and jit once around the whole march.
+- **Never.** Write a Python `for` loop or a bare `jax.lax.scan` of Runge–Kutta stages; never pass `Truncated` to a diffrax solver or a diffrax adjoint to an `AbstractStepper`.
+- **One rung down.** Open `integrix:time-stepping-with-integrix` to choose a scheme, split a stiff term, write a stepper with history, or cut the memory of a gradient.

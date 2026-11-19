@@ -1,0 +1,7 @@
+- **Provides.** Integrals in JAX as sums: I ≈ ∑ₙ wₙ f(xₙ) against a rule, the running integral Fₖ, an integrand to a tolerance, and 𝔼[f] with a standard error.
+- **Nouns.** `integrix.rule.Integral` (`value`, `error`, `n_evaluations`, `converged`) and `integrix.expect.Expectation` (`value`, `standard_error`); adaptive rules `integrix.adapt.GaussKronrod`, `integrix.adapt.TanhSinh`, `integrix.adapt.Romberg`.
+- **Verbs.** `integrix.rule.integrate(rule, values_or_fn)`, `integrix.rule.weighted_mean`, `integrix.rule.log_integrate`; `integrix.scan.cumulative(rule, values)`; `GaussKronrod()(fn, a, b)`; `integrix.expect.monte_carlo`, `integrix.expect.qmc`, `integrix.expect.importance`.
+- **Adverbs.** `axis=` (one per weights axis), `where=` and `nan_policy="omit"` on a sum; `reverse=` on a running integral; `rtol=`, `atol=` on an adaptive rule; `key=` on an expectation.
+- **Keep.** The rule is functax's (`nodes` and `weights`), a tuple of 1-D rules, or a plain weights array; read `.value` from the result and check `.converged` after an adaptive rule, since it is never raised.
+- **Never.** Write `jnp.trapezoid`, `jnp.sum(w * f)` or `jnp.cumsum` for an integral, or call `scipy.integrate.quad` or `quadax` in a traced model; never build nodes and weights here that functax already has.
+- **One rung down.** Open `integrix:quadrature-and-expectations-with-integrix` to mask or batch a sum, choose an adaptive rule, or diagnose importance weights.
