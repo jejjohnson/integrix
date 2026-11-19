@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/jejjohnson/integrix/compare/v0.0.5...v0.0.6) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** take cell areas from functax 0.0.11 ([#81](https://github.com/jejjohnson/integrix/issues/81)) ([1cd85df](https://github.com/jejjohnson/integrix/commit/1cd85dfbe075379aaffb91352ab3517ecade9d49))
+
 ## [0.0.5](https://github.com/jejjohnson/integrix/compare/v0.0.4...v0.0.5) (2026-11-10)
 
 
