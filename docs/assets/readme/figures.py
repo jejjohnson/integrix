@@ -24,7 +24,7 @@ from functax import quad
 from loguru import logger
 from scipy.special import erf
 
-from integrix import march, rule
+from integrix import expect, march, rule
 
 
 # The errors below fall to the round-off of float64, so every figure needs it.
@@ -43,6 +43,8 @@ COLOURS = {
     "heun": "#2563EB",
     "rk3": "#059669",
     "rk4": "#7C3AED",
+    "monte_carlo": "#B45309",
+    "qmc": "#2563EB",
 }
 
 
@@ -273,7 +275,120 @@ def order_figure() -> None:
     save(fig, "order.png")
 
 
-FIGURES = {"convergence": convergence_figure, "order": order_figure}
+# ---------------------------------------------------------------- expectations
+
+
+def product_of_cosines(point: jnp.ndarray) -> jnp.ndarray:
+    """f(s) = cos s₁ cos s₂, with 𝔼[f] = e⁻¹ for s ~ N(0, I)."""
+    return jnp.prod(jnp.cos(point))
+
+
+def standard_normal(key: jax.Array, n: int) -> jnp.ndarray:
+    """S draws of s ~ N(0, I) in two dimensions."""
+    return jax.random.normal(key, (n, 2))
+
+
+def expectation_figure() -> None:
+    """The error of Monte Carlo and randomised QMC against the evaluations S."""
+    exact = float(np.exp(-1.0))
+    shifts = 16
+    replicates = 20
+    counts = 2 ** np.arange(8, 17)
+    keys = jax.random.split(jax.random.key(0), replicates)
+    estimators = {
+        "monte_carlo": lambda key, n: expect.monte_carlo(
+            product_of_cosines, standard_normal, n, key=key
+        ),
+        # n points per shift, so S = n R evaluations, the same as Monte Carlo
+        "qmc": lambda key, n: expect.qmc(
+            product_of_cosines,
+            2,
+            n // shifts,
+            n_shifts=shifts,
+            transform=jax.scipy.special.ndtri,
+            key=key,
+        ),
+    }
+    rms_error, mean_stderr = {}, {}
+    for name, estimate in estimators.items():
+        rms, reported = [], []
+        for n in counts:
+            results = [estimate(key, int(n)) for key in keys]
+            errors = np.array([float(r.value) - exact for r in results])
+            # √(mean of squared errors) over the replicates
+            rms.append(float(np.sqrt(np.mean(errors**2))))
+            reported.append(float(np.mean([float(r.standard_error) for r in results])))
+        rms_error[name] = np.array(rms)
+        mean_stderr[name] = np.array(reported)
+        fitted = slope(counts, rms_error[name])
+        logger.info(
+            "expect: {}, slope {:.2f}; at S = {}, RMS error {:.1e} and mean "
+            "standard error {:.1e}",
+            name,
+            fitted,
+            int(counts[-1]),
+            rms_error[name][-1],
+            mean_stderr[name][-1],
+        )
+    ratio = rms_error["monte_carlo"][-1] / rms_error["qmc"][-1]
+    logger.info("expect: Monte Carlo over QMC at S = {}: {:.0f}", counts[-1], ratio)
+
+    fig, top = headed(
+        "integrix: quasi-Monte Carlo beats Monte Carlo, and both know their error",
+        "𝔼[cos s₁ cos s₂] = e⁻¹ for s ~ N(0, I), by expect.monte_carlo and by "
+        f"expect.qmc (Sobol points through ndtri, {shifts} random shifts),\nwith "
+        f"the same S evaluations. Solid: the RMS error over {replicates} seeds; "
+        "dashed: the mean standard error each call reported.",
+        (9, 4.6),
+    )
+    ax = fig.subplots()
+    fig.subplots_adjust(left=0.09, right=0.98, bottom=0.12, top=top - 0.06)
+    labels = {"monte_carlo": "monte_carlo", "qmc": "qmc (Sobol)"}
+    for name, label in labels.items():
+        colour = COLOURS[name]
+        ax.loglog(
+            counts,
+            rms_error[name],
+            "o-",
+            color=colour,
+            markersize=3.5,
+            linewidth=1.4,
+            label=f"{label}: RMS error",
+        )
+        ax.loglog(
+            counts,
+            mean_stderr[name],
+            "--",
+            color=colour,
+            linewidth=1,
+            label=f"{label}: standard error",
+        )
+    # S^(−1/2) and S^(−1) through each method's first point
+    for name, power, text in (("monte_carlo", -0.5, "S⁻¹ᐟ²"), ("qmc", -1.0, "S⁻¹")):
+        reference = rms_error[name][0] * (counts / counts[0]) ** power
+        ax.loglog(counts, reference, ":", color=COLOURS["reference"], linewidth=1)
+        ax.annotate(
+            text,
+            (counts[-1], reference[-1]),
+            textcoords="offset points",
+            xytext=(4, 0),
+            fontsize=8,
+            color=COLOURS["reference"],
+            va="center",
+        )
+    ax.set_xlabel("evaluations S", fontsize=9)
+    ax.set_ylabel(r"error of $\hat{I}$", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.grid(True, which="major", linewidth=0.3, alpha=0.5)
+    ax.legend(fontsize=8, frameon=False, loc="lower left")
+    save(fig, "expectations.png")
+
+
+FIGURES = {
+    "convergence": convergence_figure,
+    "order": order_figure,
+    "expectations": expectation_figure,
+}
 
 
 @app.default
@@ -281,7 +396,7 @@ def main(*, only: list[str] | None = None) -> None:
     """Draw every figure of the gallery, or only the ones named.
 
     Args:
-        only: Names from the gallery: convergence and order.
+        only: Names from the gallery: convergence, order and expectations.
     """
     for name in only or FIGURES:
         FIGURES[name]()
