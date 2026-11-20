@@ -69,32 +69,53 @@ None of it is a new framework. A rule is [`functax`](https://github.com/jejjohns
 
 ## 📐 One integral, three operations
 
-A rule replaces the integral with a weighted sum over $`N`$ nodes $`\mathbf{s}_n \in \Omega`$, with weights $`w_n`$ and samples $`f_n = f(\mathbf{s}_n)`$,
+A rule replaces the integral with a weighted sum over $`N`$ nodes $`\mathbf{s}_n \in \Omega`$, with weights $`w_n`$ and samples $`f_n = f(\mathbf{s}_n)`$. The three operations differ in what they keep of that sum and where its samples come from, and three more apply across them.
+
+**Sum** (`integrix.rule`). The whole sum, one number per integral, as in a band radiance, a column amount or the mass of a plume:
 
 ```math
 \hat{I}_N[f] = \sum_{n=1}^{N} w_n f(\mathbf{s}_n)
 ```
 
-and the three operations differ in what they keep of that sum and where its samples come from. With $`\mathbf{x}_k \in \mathbb{R}^{D_x}`$ the state of a model at time $`t_k`$, $`E_N[f] = I[f] - \hat{I}_N[f]`$ the error of a rule and $`p`$ a probability density on $`\Omega`$:
+**Scan** (`integrix.scan`). The integral up to every node, as in optical depth or cumulative mass. For the trapezoid rule on nodes $`s_1, \dots, s_N`$, the running integral $`F_k`$ from $`s_1`$ to $`s_k`$ grows by one strip per node:
 
-| Operation | Equation | Module | For |
-|---|---|---|---|
-| Sum | $`\hat{I}_N[f] = \sum_n w_n f_n`$ | `integrix.rule` | a band radiance, a column amount, the mass of a plume |
-| Scan | $`F_k = F_{k-1} + \frac{1}{2} (s_k - s_{k-1}) (f_{k-1} + f_k)`$ | `integrix.scan` | the integral up to every node: optical depth, cumulative mass |
-| March | $`\mathbf{x}_{k+1} = \mathbf{x}_k + \int_{t_k}^{t_{k+1}} f(\mathbf{x}(t), t) \mathrm{d}t`$ | `integrix.march` | an integrand that depends on the solution, as in time stepping |
-| Adapt | $`\vert E_N[f] \vert \le \max(\epsilon_\text{abs}, \epsilon_\text{rel} \vert \hat{I}_N[f] \vert)`$ | `integrix.adapt` | a rule or a scan refined to a tolerance |
-| Differentiate | reverse mode, checkpointed or truncated | `integrix.adjoint` | gradients through a long scan or march |
-| Expect | $`\mathbb{E}_p[f] = \int_\Omega f(\mathbf{s}) p(\mathbf{s}) \mathrm{d}\mathbf{s}`$ | `integrix.expect` | an integral against a probability, by sampling |
+```math
+F_k = F_{k-1} + \frac{1}{2} (s_k - s_{k-1}) (f_{k-1} + f_k)
+```
 
-The first three rows are the operations, and the last three apply across them: adaptivity refines a rule or a scan, an adjoint runs back through a scan or a march, and an expectation is an integral against a probability.
+**March** (`integrix.march`). An integrand that depends on the solution, as in time stepping. With $`\mathbf{x}_k \in \mathbb{R}^{D_x}`$ the state of a model at time $`t_k`$, each step integrates the right-hand side $`f`$ of an ODE:
 
-The march row is the integral form of an ODE whose right-hand side $`f`$ is the integrand. A Runge–Kutta step with $`N_\text{stage}`$ stages and step $`h`$ is a rule on $`[t_k, t_k + h]`$, with the nodes $`t_k + c_i h`$ and the weights $`h b_i`$ of its Butcher tableau,
+```math
+\mathbf{x}_{k+1} = \mathbf{x}_k + \int_{t_k}^{t_{k+1}} f(\mathbf{x}(t), t) \mathrm{d}t
+```
+
+A Runge–Kutta step with $`N_\text{stage}`$ stages and step $`h`$ is a rule on $`[t_k, t_k + h]`$, with the nodes $`t_k + c_i h`$ and the weights $`h b_i`$ of its Butcher tableau,
 
 ```math
 \int_{t_k}^{t_k + h} f(t) \mathrm{d}t \approx h \sum_{i=1}^{N_\text{stage}} b_i f(t_k + c_i h)
 ```
 
 except that each stage evaluates $`f`$ at a state the earlier stages built, so a march is stepped one node at a time where a rule is summed in one pass ([chapter 7](https://jejjohnson.github.io/integrix/marches/) of the mathematical reference).
+
+**Adapt** (`integrix.adapt`). A rule or a scan refined until the error of the rule, $`E_N[f] = I[f] - \hat{I}_N[f]`$, meets a tolerance:
+
+```math
+\vert E_N[f] \vert \le \max(\epsilon_\text{abs}, \epsilon_\text{rel} \vert \hat{I}_N[f] \vert)
+```
+
+**Differentiate** (`integrix.adjoint`). Gradients through a long scan or march. Write one step of a march as $`\mathbf{x}_{k+1} = \Phi(\mathbf{x}_k)`$, with Jacobian $`\mathbf{J}_{\Phi,k} = \partial \Phi / \partial \mathbf{x}`$ at $`\mathbf{x}_k`$, and let the cost $`\mathcal{J}`$ sum a misfit $`\mathcal{J}_k(\mathbf{x}_k)`$ at every step. The adjoint state $`\mathbf{x}^\dagger_k \in \mathbb{R}^{D_x}`$ then runs backwards from the last step,
+
+```math
+\mathbf{x}^\dagger_k = \mathbf{J}_{\Phi,k}^\top \mathbf{x}^\dagger_{k+1} + \nabla_{\mathbf{x}_k} \mathcal{J}_k
+```
+
+and its value at the first step is the gradient $`\nabla_{\mathbf{x}_0} \mathcal{J}`$. Plain reverse mode stores every state for this backward march, `Checkpointed` stores one state per block and recomputes the rest, and `Truncated` stops the backward march after a fixed number of steps ([chapter 9](https://jejjohnson.github.io/integrix/adjoints/)).
+
+**Expect** (`integrix.expect`). An integral against a probability density $`p`$ on $`\Omega`$, estimated by sampling:
+
+```math
+\mathbb{E}_p[f] = \int_\Omega f(\mathbf{s}) p(\mathbf{s}) \mathrm{d}\mathbf{s}
+```
 
 ## 📥 Install
 
