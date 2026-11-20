@@ -103,7 +103,13 @@ except that each stage evaluates $`f`$ at a state the earlier stages built, so a
 \vert E_N[f] \vert \le \max(\epsilon_\text{abs}, \epsilon_\text{rel} \vert \hat{I}_N[f] \vert)
 ```
 
-**Differentiate** (`integrix.adjoint`). Gradients through a long scan or march, by plain reverse mode, by reverse mode with checkpoints, or truncated to the last steps.
+**Differentiate** (`integrix.adjoint`). Gradients through a long scan or march. Write one step of a march as $`\mathbf{x}_{k+1} = \Phi(\mathbf{x}_k)`$, with Jacobian $`\mathbf{J}_{\Phi,k} = \partial \Phi / \partial \mathbf{x}`$ at $`\mathbf{x}_k`$, and let the cost $`\mathcal{J}`$ sum a misfit $`\mathcal{J}_k(\mathbf{x}_k)`$ at every step. The adjoint state $`\mathbf{x}^\dagger_k \in \mathbb{R}^{D_x}`$ then runs backwards from the last step,
+
+```math
+\mathbf{x}^\dagger_k = \mathbf{J}_{\Phi,k}^\top \mathbf{x}^\dagger_{k+1} + \nabla_{\mathbf{x}_k} \mathcal{J}_k
+```
+
+and its value at the first step is the gradient $`\nabla_{\mathbf{x}_0} \mathcal{J}`$. Plain reverse mode stores every state for this backward march, `Checkpointed` stores one state per block and recomputes the rest, and `Truncated` stops the backward march after a fixed number of steps ([chapter 9](https://jejjohnson.github.io/integrix/adjoints/)).
 
 **Expect** (`integrix.expect`). An integral against a probability density $`p`$ on $`\Omega`$, estimated by sampling:
 
