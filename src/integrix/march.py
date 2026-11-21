@@ -10,6 +10,8 @@ loop carry; `run` also takes the diffrax solvers. Each scheme comes with its
 pure step function for an autonomous right-hand side f(y). `imex_solver`,
 `imex_stepsize_controller` and `stable_step` (moved from sesmax-core) give a
 matrix-free IMEX solve, its step control and the explicit CFL bound.
+`semi_lagrangian_step` and `SemiLagrangianSolver` advect a field by reading
+it at departure points that `departure_points` integrates along the flow.
 """
 
 from __future__ import annotations
@@ -41,6 +43,12 @@ from integrix._src.march._multistep import (
     ab3_step,
     leapfrog_raf_step,
 )
+from integrix._src.march._semi_lagrangian import (
+    SemiLagrangianSolver,
+    SemiLagrangianTerm,
+    departure_points,
+    semi_lagrangian_step,
+)
 from integrix._src.march._split_explicit import (
     SplitExplicitRKSolver,
     SplitExplicitTerms,
@@ -62,10 +70,13 @@ __all__ = [  # noqa: RUF022
     "RK4Classic",
     "SSP_RK104",
     "SSP_RK2",
+    "SemiLagrangianSolver",
+    "SemiLagrangianTerm",
     "SplitExplicitRKSolver",
     "SplitExplicitTerms",
     "ab2_step",
     "ab3_step",
+    "departure_points",
     "euler_step",
     "heun_step",
     "imex_solver",
@@ -75,6 +86,7 @@ __all__ = [  # noqa: RUF022
     "rk3_ssp_step",
     "rk4_step",
     "run",
+    "semi_lagrangian_step",
     "split_explicit_step",
     "stable_step",
 ]
