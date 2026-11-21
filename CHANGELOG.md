@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/jejjohnson/integrix/compare/v0.0.7...v0.0.8) (2026-11-21)
+
+
+### Features
+
+* **march:** a semi-Lagrangian step reads any functax plan at second-order departure points ([#93](https://github.com/jejjohnson/integrix/issues/93)) ([5e4a8bf](https://github.com/jejjohnson/integrix/commit/5e4a8bf1d9cfb1ee52632f144f3a962bef1ad28a)), closes [#92](https://github.com/jejjohnson/integrix/issues/92)
+
 ## [0.0.7](https://github.com/jejjohnson/integrix/compare/v0.0.6...v0.0.7) (2026-11-19)
 
 
