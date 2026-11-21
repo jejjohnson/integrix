@@ -132,6 +132,18 @@ names = [
 ]
 
 [[entries]]
+file = "semi-lagrangian"
+title = "Semi-Lagrangian advection"
+role = "strategy"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "a tracer advected past the CFL limit by reading the old field at departure points, with a midpoint trajectory and any functax read-out"
+names = [
+    "integrix.march.departure_points", "integrix.march.semi_lagrangian_step",
+    "integrix.march.SemiLagrangianSolver", "integrix.march.SemiLagrangianTerm",
+]
+
+[[entries]]
 file = "step-functions"
 title = "Pure step functions"
 role = "primitive"

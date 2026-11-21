@@ -265,6 +265,63 @@ with vertical diffusion:   h_max = 49.8 s
 
 This is why the vertical diffusion goes into the implicit half of an IMEX scheme. `IMEX_SSP2` treats the explicit term with an SSP Runge–Kutta tableau and the stiff term with an A-stable implicit one ($|R(\zeta)| \le 1$ for every $\zeta$ with a negative real part), so the step is set by the advection alone. Three more stability ideas complete the set in `integrix.march`. SSP methods keep a property of forward Euler, such as no new extrema in a tracer, under a step-size bound. The leapfrog step has a second, computational mode that flips sign every step, which the Robert–Asselin filter damps at the cost of first-order accuracy. The split-explicit step subcycles the fast mode with small steps so that the slow mode can take large ones.
 
+## Semi-Lagrangian advection: integrate along the flow
+
+A tracer $q(t, \vect{x})$ carried by a velocity $\vect{u}(t, \vect{x})$ obeys $\partial_t q + \vect{u} \cdot \nabla q = 0$, so it is constant along the characteristics $\dot{\vect{X}} = \vect{u}(t, \vect{X})$. A semi-Lagrangian step uses that directly. The new value at a node $\vect{x}$ is the old value at the departure point $\vect{x}_d$, the point that the flow carries to $\vect{x}$ in one step,
+
+$$q(t + h, \vect{x}) = q(t, \vect{x}_d), \text{ where } \vect{x}_d = \vect{x} - \int_t^{t+h} \vect{u}(s, \vect{X}(s)) \mathrm{d}s$$ (eq-semi-lagrangian)
+
+The integral is a march again, now along the trajectory instead of over the state. [`departure_points`](xref:api#integrix.march.departure_points) takes it with the midpoint rule at the middle of the trajectory, solved by fixed-point iteration from one Euler step,
+
+$$\vect{x}_d^{(k+1)} = \vect{x} - h \vect{u}\left(t + \frac{h}{2}, \frac{\vect{x} + \vect{x}_d^{(k)}}{2}\right)$$ (eq-midpoint-trajectory)
+
+which is second order in $h$ after one iteration; with none it is the first-order Euler point $\vect{x} - h \vect{u}(t, \vect{x})$. Reading $q$ at $\vect{x}_d$ is an interpolation, which functax owns, so [`semi_lagrangian_step`](xref:api#integrix.march.semi_lagrangian_step) takes the read-out as an argument. The step only reads the old field, so it has no CFL limit. The read-out sets the accuracy instead, because the field is interpolated once per step: for a read-out of order $p$ on a spacing $\Delta s$, the error over a fixed time is $O(h^2) + O(\Delta s^{p+1} / h)$. Long steps are cheap, and a low-order read-out loses accuracy at every one of them.
+
+```python
+# Shapes: N = 128 periodic nodes on [0, 1), D = 1; K = 200 steps at CFL 0.37
+from functax.geometry import Axis, Points
+from functax.interp import BSpline, Linear
+
+nodes_1d = jnp.arange(128) / 128                                  # → (128,)
+periodic = Axis(nodes_1d, period=1.0)
+nodes = einx.id("node -> node 1", nodes_1d)                       # → (128, 1)
+step_size = 0.37 / 128
+
+
+def tracer(s):
+    # q₀(s) = exp(−((s − ½) / 0.05)²), periodic
+    return jnp.exp(-(((s - 0.5 + 0.5) % 1.0 - 0.5) / 0.05) ** 2)
+
+
+def advect(scheme):
+    def readout(departure):
+        # today (functax)
+        # the old field read at x_d
+        return scheme.plan(periodic, Points(departure))
+
+    def body(q, k):
+        # today (integrix)
+        # q(t + h, x) = q(t, x_d)
+        q_new = march.semi_lagrangian_step(
+            q, nodes, lambda t, p: jnp.ones_like(p), readout, k * step_size, step_size
+        )
+        return q_new, None
+
+    q, _ = jax.lax.scan(body, tracer(nodes_1d), jnp.arange(200.0))  # → (128,)
+    return q
+
+
+for name, scheme in [("linear", Linear()), ("cubic B-spline", BSpline(3))]:
+    print(f"{name:15s} peak {float(advect(scheme).max()):.3f}")
+```
+
+```text
+linear          peak 0.552
+cubic B-spline  peak 0.997
+```
+
+The exact peak is 1. The linear read-out keeps 55 % of it after 200 steps, while the cubic B-spline (SciPy's order-3 spline) keeps 99.7 %. A linear read-out never leaves the old field's range, but a cubic one can overshoot it; functax's `Pchip` is the monotone choice. [`SemiLagrangianSolver`](xref:api#integrix.march.SemiLagrangianSolver) runs the same step under `diffeqsolve`, with the characteristic equation as its term.
+
 ## Local stencils and global transforms in space
 
 Finally, the tendency $f$ itself sits on one side of chapter 3 or the other. In a finite-volume model it is a local stencil: each cell's tendency reads a few neighbours, and its Jacobian is sparse. In a spectral model it is a global transform: each tendency goes through spherical harmonics or Fourier modes, and every point depends on every other. integrix does not care which, since the steppers only call $f$, so the same `RK3SSP` can step a finite-volume tendency or a spectral one.
