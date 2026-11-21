@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/jejjohnson/integrix/compare/v0.0.8...v0.0.9) (2026-11-21)
+
+
+### Bug Fixes
+
+* **march:** the semi-Lagrangian solver runs under diffeqsolve with a velocity that reads only points ([#95](https://github.com/jejjohnson/integrix/issues/95)) ([cd2c2fc](https://github.com/jejjohnson/integrix/commit/cd2c2fcd09b0a1944417d07f460018f47cb4545e))
+
 ## [0.0.8](https://github.com/jejjohnson/integrix/compare/v0.0.7...v0.0.8) (2026-11-21)
 
 
