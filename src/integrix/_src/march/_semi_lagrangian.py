@@ -20,6 +20,8 @@ from typing import Any, ClassVar
 
 import diffrax as dfx
 import equinox as eqx
+import jax
+import jax.numpy as jnp
 from diffrax import RESULTS
 from jaxtyping import Array, Float, PyTree, ScalarLike
 
@@ -197,9 +199,12 @@ def semi_lagrangian_step(
 class SemiLagrangianTerm(dfx.AbstractTerm):
     """The characteristic equation Ẋ = u(t, X), as a diffrax term.
 
-    `SemiLagrangianSolver` integrates this term backward along the
-    trajectories from its nodes, so its state is positions, not the field:
-    ``vf(t, x, args)`` is the velocity u(t, x) at N points x.
+    `SemiLagrangianSolver` integrates the characteristics backward from its
+    nodes by calling ``velocity(t, x)`` at N points x itself. The field has
+    no tendency, so ``vf(t, y, args)`` is a zero field shaped like y: it is
+    what `diffrax.diffeqsolve` evaluates on ``y0`` to check the term, and a
+    velocity that only reads N points (a functax plan, say) never sees the
+    field.
 
     Attributes:
         velocity: The velocity u(t, x), evaluated at N points at once.
@@ -207,21 +212,23 @@ class SemiLagrangianTerm(dfx.AbstractTerm):
     Examples:
         >>> import jax.numpy as jnp
         >>> term = SemiLagrangianTerm(lambda t, x: 2.0 * x)
-        >>> term.vf(0.0, jnp.array([[1.0]]), None).tolist()
+        >>> term.velocity(0.0, jnp.array([[1.0]])).tolist()
         [[2.0]]
+        >>> term.vf(0.0, jnp.ones(3), None).tolist()
+        [0.0, 0.0, 0.0]
     """
 
     velocity: Velocity
 
     def vf(self, t, y, args):
-        return self.velocity(t, y)
+        return jax.tree.map(jnp.zeros_like, y)
 
     def contr(self, t0, t1, **kwargs):
         del kwargs
         return t1 - t0
 
     def prod(self, vf, control):
-        return vf * control
+        return jax.tree.map(lambda v: v * control, vf)
 
 
 class SemiLagrangianSolver(dfx.AbstractSolver):
@@ -288,18 +295,19 @@ class SemiLagrangianSolver(dfx.AbstractSolver):
 
     def step(self, terms, t0, t1, y0, args, solver_state, made_jump):
         del solver_state, made_jump
-
-        def velocity(t, x):
-            return terms.vf(t, x, args)
-
+        # diffeqsolve wraps the term with its time direction (diffrax's
+        # WrapTerm, whose vf evaluates at direction · t); read the velocity
+        # from the term inside and step in real time
+        term = getattr(terms, "term", terms)
+        direction = getattr(terms, "direction", 1)
         # q(tₙ₊₁, x) = q(tₙ, x_d)
         y1 = semi_lagrangian_step(
             y0,
             self.nodes,
-            velocity,
+            term.velocity,
             self.readout,
-            t0,
-            t1 - t0,
+            direction * t0,
+            direction * (t1 - t0),
             iterations=self.iterations,
         )
         dense_info = dict(y0=y0, y1=y1)
