@@ -231,6 +231,34 @@ def test_solver_under_diffeqsolve_matches_the_step():
         solver.func(term, 0.0, field, None)
 
 
+def test_solver_takes_a_velocity_that_reads_only_points():
+    # diffeqsolve checks the term on y0, the field; a velocity sampled by a
+    # functax plan reads only (N, D) points and must never see it
+    n = 8
+    axis = jnp.arange(n, dtype=float) / n
+    grid = RectilinearGrid((Axis(axis, period=1.0), Axis(axis, period=1.0)))
+    rows, cols = jnp.meshgrid(axis, axis, indexing="ij")
+    nodes = jnp.column_stack([rows.ravel(), cols.ravel()])
+    speed = jnp.ones(n * n)
+
+    def readout(departure):
+        return Linear().plan(grid, Points(departure))
+
+    def velocity(t, p):
+        plan = readout(p)
+        return jnp.column_stack([0.0 * plan(speed), plan(speed)])
+
+    field = jnp.sin(2 * jnp.pi * cols.ravel())
+    solver = im.SemiLagrangianSolver(nodes=nodes, readout=readout)
+    solution = dfx.diffeqsolve(
+        im.SemiLagrangianTerm(velocity), solver, 0.0, 0.25, 0.125, field
+    )
+    # two steps of 1/8 in x at speed 1: one node each, which a linear
+    # read-out reproduces exactly
+    expected = jnp.sin(2 * jnp.pi * (cols.ravel() - 0.25))
+    assert jnp.allclose(solution.ys[0], expected, atol=1e-12)
+
+
 @pytest.mark.parametrize("iterations", [-1, True])
 def test_bad_iterations_raise(iterations):
     _, nodes, readout, velocity_at = _smooth_problem()
