@@ -87,7 +87,8 @@ def imex_stepsize_controller(
     *,
     rtol: float = 1e-4,
     atol: float = 1e-6,
-) -> dfx.PIDController:
+    step_ts: Float[Array, " step"] | None = None,
+) -> dfx.PIDController | dfx.ClipStepSizeController:
     """An adaptive PID step-size controller for an IMEX solve.
 
     A fixed-step controller with an implicit solver needs the implicit
@@ -98,16 +99,29 @@ def imex_stepsize_controller(
     Args:
         rtol: Relative tolerance of the step-size control.
         atol: Absolute tolerance of the step-size control.
+        step_ts: Times to step to exactly, such as the sample times of a
+            forcing (`SampledPath.ts`), where it has a kink that would cost a
+            straddling step its order; ``None`` for no such times.
 
     Returns:
-        A `diffrax.PIDController`.
+        A `diffrax.PIDController`, inside a `diffrax.ClipStepSizeController`
+        when ``step_ts`` is given.
 
     Examples:
         >>> controller = imex_stepsize_controller(rtol=1e-6, atol=1e-8)
         >>> controller.rtol, controller.atol
         (1e-06, 1e-08)
+
+        With times to land on:
+
+        >>> clipped = imex_stepsize_controller(step_ts=jnp.array([0.5, 1.0]))
+        >>> type(clipped).__name__, clipped.step_ts.tolist()
+        ('ClipStepSizeController', [0.5, 1.0])
     """
-    return dfx.PIDController(rtol=rtol, atol=atol)
+    controller = dfx.PIDController(rtol=rtol, atol=atol)
+    if step_ts is None:
+        return controller
+    return dfx.ClipStepSizeController(controller, step_ts=step_ts)
 
 
 def stable_step(

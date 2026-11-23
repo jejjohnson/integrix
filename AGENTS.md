@@ -76,6 +76,7 @@ Before writing a helper, a validator, a rule, a stepper or an adjoint, find out 
 | `jnp.linalg.solve`, `jnp.linalg.inv`, a hand-rolled Newton or CG | lineax, optimistix or gaussx |
 | A time-stepping loop around a diffrax solver | `diffrax.diffeqsolve` |
 | An SSP-RK, RK4, IMEX or Adams–Bashforth step, a Butcher tableau | `integrix.march` (`RK3SSP`, `SSP_RK104`, `IMEX_SSP2`, `AB3Solver`, … and `rk3_ssp_step`, `imex_ssp2_step`, …) |
+| A `dfx.LinearInterpolation` or `CubicInterpolation` of a sampled forcing, a diffrax path around a functax fit | `integrix.march.SampledPath`, with `imex_stepsize_controller(step_ts=path.ts)` |
 | A `lax.scan` loop for a multistep, leapfrog or split-explicit scheme, history kept on a module | `integrix.march.AbstractStepper` and `run` (`AB2Solver`, `LeapfrogRAFSolver`, `SplitExplicitRKSolver`) |
 | `jax.lax.stop_gradient` on a scan carry before the last k steps, mapping a pipekit adjoint spec to diffrax | `integrix.adjoint.truncated_scan` / `Truncated`, `to_diffrax_adjoint` |
 | `jax.checkpoint` blocks over a `lax.scan`, a long rollout that runs out of memory in reverse mode | `integrix.adjoint.checkpointed_scan`, or `ix.march.run(..., adjoint=Checkpointed(every=k))` |

@@ -12,6 +12,7 @@ pure step function for an autonomous right-hand side f(y). `imex_solver`,
 matrix-free IMEX solve, its step control and the explicit CFL bound.
 `semi_lagrangian_step` and `SemiLagrangianSolver` advect a field by reading
 it at departure points that `departure_points` integrates along the flow.
+`SampledPath` makes sampled data a diffrax path, to force an ODE or drive a CDE.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ from integrix._src.march._multistep import (
     ab3_step,
     leapfrog_raf_step,
 )
+from integrix._src.march._sampled_path import SampledPath
 from integrix._src.march._semi_lagrangian import (
     SemiLagrangianSolver,
     SemiLagrangianTerm,
@@ -70,6 +72,7 @@ __all__ = [  # noqa: RUF022
     "RK4Classic",
     "SSP_RK104",
     "SSP_RK2",
+    "SampledPath",
     "SemiLagrangianSolver",
     "SemiLagrangianTerm",
     "SplitExplicitRKSolver",
