@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.10](https://github.com/jejjohnson/integrix/compare/v0.0.9...v0.0.10) (2026-11-23)
+
+
+### Features
+
+* **march:** sampled forcings and controls are read through any functax scheme, as a diffrax path ([#99](https://github.com/jejjohnson/integrix/issues/99)) ([ed5edfd](https://github.com/jejjohnson/integrix/commit/ed5edfdb31a45418c2fc54d4744c6cf52e6c493a)), closes [#97](https://github.com/jejjohnson/integrix/issues/97)
+
 ## [0.0.9](https://github.com/jejjohnson/integrix/compare/v0.0.8...v0.0.9) (2026-11-21)
 
 
