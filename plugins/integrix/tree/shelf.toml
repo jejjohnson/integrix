@@ -144,6 +144,15 @@ names = [
 ]
 
 [[entries]]
+file = "sampled-paths"
+title = "Sampled forcing and controls"
+role = "strategy"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "forcing or control data known at sample times, read between them through any functax 1-D scheme as a diffrax path"
+names = ["integrix.march.SampledPath"]
+
+[[entries]]
 file = "step-functions"
 title = "Pure step functions"
 role = "primitive"

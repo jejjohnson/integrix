@@ -66,6 +66,9 @@ One departure from the stack's notation standard is deliberate. There, $f$ is th
 | $h$, $K$ | | the step, and the number of steps to the end time $T = K h$ | `dt`, `n_steps` |
 | $a_{ij}$, $b_i$, $c_i$, $N_\text{stage}$ | | the Butcher coefficients of a Runge–Kutta method, and its number of stages | |
 | $\vect{k}_i$ | $\mathbb{R}^{D_x}$ | the stage tendencies | |
+| $\vect{u}(t)$, $\bar{t}_j$, $\vect{u}_j$ | $\mathbb{R}^{D_x}$ | a forcing, its sample times and its samples | `ts`, `us` |
+| $\hat{\vect{u}}(t)$, $\vect{d}_j$ | $\mathbb{R}^{D_x}$ | the reconstruction of the samples, and its slopes at the sample times | `SampledPath` |
+| $\Delta_j$, $\tau$ | | the spacing $\bar{t}_{j+1} - \bar{t}_j$, and the offset of a time in its interval | |
 | $\gamma$, $\zeta = h \gamma$, $R(\zeta)$ | $\mathbb{C}$ | an eigenvalue of the linearised tendency, its scaled form, and a stepper's stability function | |
 :::
 

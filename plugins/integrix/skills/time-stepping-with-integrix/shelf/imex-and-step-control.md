@@ -14,7 +14,7 @@ All of them live in `integrix.march`.
 | `IMEX_SSP2(root_finder=...)` | IMEX-SSP2(2,2,2) as a diffrax solver for a `diffrax.MultiTerm` of an explicit and an implicit term. |
 | `imex_ssp2_step(state, rhs_explicit, rhs_implicit, implicit_solve, dt)` | One IMEX-SSP2 step with your own implicit solve, `implicit_solve(r, gamma_dt)` returning Y with Y − γh f_I(Y) = r. |
 | `imex_solver(*, rtol=1e-4, atol=1e-6, gmres_restart=20)` | A `diffrax.KenCarp3` whose implicit stage is matrix-free (Newton with GMRES). |
-| `imex_stepsize_controller(*, rtol=1e-4, atol=1e-6)` | An adaptive `diffrax.PIDController` for an IMEX solve. |
+| `imex_stepsize_controller(*, rtol=1e-4, atol=1e-6, step_ts=None)` | An adaptive `diffrax.PIDController` for an IMEX solve, stepping exactly to the times `step_ts` when they are given. |
 | `stable_step(spacing, *, speed=(), diffusivity=(), cfl=1.0)` | The largest stable forward-Euler step for advection and diffusion together: CFL / (∑ᵢ \|uᵢ\| / Δxᵢ + 2 ∑ᵢ Kᵢ / Δxᵢ²). |
 
 ## Use it

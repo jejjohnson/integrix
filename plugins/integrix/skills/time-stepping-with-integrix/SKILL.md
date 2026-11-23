@@ -31,6 +31,7 @@ Integrals that do not step in time are in `integrix:quadrature-and-expectations-
 | A stiff term beside a non-stiff one, fixed step | `IMEX_SSP2()` |
 | A stiff term, adaptive step, no Jacobian matrix | `imex_solver()` with `imex_stepsize_controller()` |
 | An adaptive explicit step | `RK2Heun()` with a diffrax controller |
+| A forcing or control known at sample times | `SampledPath.fit(scheme, ts, us)`, beside any of the above |
 
 ## Worked example
 
@@ -125,6 +126,7 @@ Open the one the task needs; do not read them all.
 | ② strategy | [Single-step schemes as diffrax solvers](shelf/diffrax-solvers.md) | forward Euler, Heun, the SSP Runge–Kutta schemes, classical RK4 and AB3, each a diffrax solver for diffeqsolve or for the march | 7 |
 | ② strategy | [IMEX schemes and the stable step](shelf/imex-and-step-control.md) | a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller and the explicit CFL bound | 5 |
 | ② strategy | [Semi-Lagrangian advection](shelf/semi-lagrangian.md) | a tracer advected past the CFL limit by reading the old field at departure points, with a midpoint trajectory and any functax read-out | 4 |
+| ② strategy | [Sampled forcing and controls](shelf/sampled-paths.md) | forcing or control data known at sample times, read between them through any functax 1-D scheme as a diffrax path | 1 |
 | ① primitive | [Pure step functions](shelf/step-functions.md) | one step of each explicit scheme for an autonomous right-hand side, to put inside your own scan | 8 |
 | ② strategy | [Adjoints through a march](shelf/adjoints.md) | the exact gradient in less memory by checkpointing, a gradient cut to the last k steps, their scan forms, and the bridge to a diffrax adjoint | 5 |
 <!-- shelf:end -->

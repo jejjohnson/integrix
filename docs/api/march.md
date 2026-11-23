@@ -6,6 +6,8 @@ For a model with a stiff term, `imex_solver` returns diffrax's `KenCarp3` with a
 
 Semi-Lagrangian advection reads the old field at departure points: `departure_points` integrates the trajectory back from each node with the midpoint rule, $\vect{x}_d = \vect{x} - h \vect{u}(t + h/2, (\vect{x} + \vect{x}_d)/2)$, and `semi_lagrangian_step` (or `SemiLagrangianSolver` under `diffeqsolve`) reads the field there with any functax interpolation plan the caller passes in. It has no CFL limit and no grid of its own.
 
+`SampledPath` is a functax fit of samples $(t_k, \vect{u}_k)$ as a diffrax path, so any functax 1-D scheme can force an ODE or drive a CDE. A step that straddles a sample loses order there, so `imex_stepsize_controller(step_ts=path.ts)` makes the adaptive steps land on the samples.
+
 The steppers moved in from finitevolX at `82090a3`, and the IMEX solver and step control from sesmax-core at `f08f59d`, with their interfaces unchanged; the source libraries' tests run against them (gate G1-port).
 
 The theory is in the [Marches](../marches/) chapter of the mathematical reference.

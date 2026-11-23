@@ -322,6 +322,75 @@ cubic B-spline  peak 0.997
 
 The exact peak is 1. The linear read-out keeps 55 % of it after 200 steps, while the cubic B-spline (SciPy's order-3 spline) keeps 99.7 %. A linear read-out never leaves the old field's range, but a cubic one can overshoot it; functax's `Pchip` is the monotone choice. [`SemiLagrangianSolver`](xref:api#integrix.march.SemiLagrangianSolver) runs the same step under `diffeqsolve`, with the characteristic equation as its term.
 
+## Sampled forcing: a tendency known at samples
+
+A forced model $\dot{\vect{x}} = f(\vect{x}, t) + \vect{u}(t)$ often knows its forcing $\vect{u}(t) \in \mathbb{R}^{D_x}$ (not the velocity of the last section) only at the samples $\vect{u}_j = \vect{u}(\bar{t}_j)$, such as six-hourly reanalysis winds or daily river discharge. The stages of a step read the forcing at $t_k + c_i h$, between the sample times $\bar{t}_j$, so the samples must first become a function $\hat{\vect{u}}(t)$. This is the interpolation of chapter 4, now in time, and functax owns it: on the interval $[\bar{t}_j, \bar{t}_{j+1}]$ of width $\Delta_j$, at the offset $\tau = (t - \bar{t}_j) / \Delta_j$, the linear scheme is
+
+$$\hat{\vect{u}}(t) = (1 - \tau) \vect{u}_j + \tau \vect{u}_{j+1}$$ (eq-linear-forcing)
+
+and every cubic one is the Hermite form
+
+$$\hat{\vect{u}}(t) = \varphi_{00}(\tau) \vect{u}_j + \varphi_{10}(\tau) \Delta_j \vect{d}_j + \varphi_{01}(\tau) \vect{u}_{j+1} + \varphi_{11}(\tau) \Delta_j \vect{d}_{j+1}$$ (eq-hermite-forcing)
+
+with $\varphi_{00} = 2 \tau^3 - 3 \tau^2 + 1$, $\varphi_{10} = \tau^3 - 2 \tau^2 + \tau$, $\varphi_{01} = 3 \tau^2 - 2 \tau^3$ and $\varphi_{11} = \tau^3 - \tau^2$. The schemes differ only in the slopes $\vect{d}_j$ at the samples, and through them in how smooth $\hat{\vect{u}}$ is ([](#tbl-forcing-schemes)).
+
+:::{table} The slopes of each reconstruction of the samples, with the secants $\gvect{\delta}_j = (\vect{u}_{j+1} - \vect{u}_j) / \Delta_j$.
+:label: tbl-forcing-schemes
+
+| Scheme | Slopes $\vect{d}_j$ | Continuity | What it keeps |
+| --- | --- | --- | --- |
+| `Linear` | none | $C^0$ | the range of the neighbouring samples |
+| diffrax's backward Hermite | $\gvect{\delta}_{j-1}$ | $C^1$ | causality: an interval reads no sample past its end |
+| `Pchip` | a weighted harmonic mean of $\gvect{\delta}_{j-1}$ and $\gvect{\delta}_j$, 0 at a local extremum | $C^1$ | the range of the neighbouring samples, so a discharge stays non-negative |
+| `CubicSpline` | a tridiagonal solve that makes $\ddot{\hat{\vect{u}}}$ continuous | $C^2$ | cubics |
+:::
+
+[`SampledPath`](xref:api#integrix.march.SampledPath) is the fitted $\hat{\vect{u}}$ as a diffrax path. Its `evaluate(t)` goes into a vector field, and its increments $\hat{\vect{u}}(t_{k+1}) - \hat{\vect{u}}(t_k)$ drive a controlled differential equation $\mathrm{d}\vect{x} = f(\vect{x}) \mathrm{d}\hat{\vect{u}}(t)$ through `diffrax.ControlTerm`.
+
+The reconstruction is smooth only between the samples, and that limits the order of the march. A step that straddles a sample where $\hat{\vect{u}}$ is only $C^r$ has local error $O(h^{r+2})$, so with a fixed number of samples the global error is $O(h^{r+2}) + O(h^q)$ for a method of order $q$, instead of $O(h^q)$. We integrate the linear interpolant of $\sin t$, sampled every ½, by RK4, with steps that land on the samples and with steps that do not.
+
+```python
+# Shapes: N_t = 9 samples of one channel, K steps
+from functax.interp import Linear
+
+sample_times = jnp.linspace(0.0, 4.0, 9)                          # → (9,)
+samples = jnp.sin(sample_times)                                   # → (9,)
+# today (integrix)
+# û(t) = (1 − τ) uⱼ + τ uⱼ₊₁
+forcing = march.SampledPath.fit(Linear(), sample_times, samples)  # → path
+# ∫₀⁴ û dt, exactly: the trapezoid sum of a linear interpolant
+exact = jnp.trapezoid(samples, sample_times)                      # → ()
+
+
+def forced_error(n_steps):
+    term = dfx.ODETerm(lambda t, x, args: forcing.evaluate(t))
+    # today (integrix)
+    # ẋ = û(t), in K equal steps
+    solution = dfx.diffeqsolve(
+        term, march.RK4Classic(), 0.0, 4.0, 4.0 / n_steps, jnp.array(0.0)
+    )
+    return abs(float(solution.ys[-1] - exact))
+
+
+on_samples = max(forced_error(n) for n in (8, 16, 32))
+counts = [15, 31, 63]
+straddling = [forced_error(n) for n in counts]
+slope = np.polyfit(np.log([4.0 / n for n in counts]), np.log(straddling), 1)[0]
+print(f"steps on the samples:   error below 1e-14: {on_samples < 1e-14}")
+print(f"steps across them:      error {straddling[0]:.1e} to {straddling[-1]:.1e}")
+print(f"                        observed order {slope:.2f}")
+```
+
+```text
+steps on the samples:   error below 1e-14: True
+steps across them:      error 1.3e-03 to 7.6e-05
+                        observed order 2.00
+```
+
+RK4 integrates each linear piece exactly, so the error is at rounding when the steps land on the samples. When they straddle them, the fourth-order method is second order. So the samples should be step times: `imex_stepsize_controller(step_ts=forcing.ts)` does this for adaptive steps, and a fixed step should divide the sample spacing.
+
+Two rules from functax matter here. A solver's last stage can land a rounding error past the last sample, where functax's default is NaN, so `SampledPath` holds the end values instead; `Policies(outside="extrapolate")` continues the end interval, as diffrax's paths do. And `Cubic` and `BSpline` read in index space, so they refuse unevenly spaced times, for which `CubicSpline` and `Pchip` are the smooth choices.
+
 ## Local stencils and global transforms in space
 
 Finally, the tendency $f$ itself sits on one side of chapter 3 or the other. In a finite-volume model it is a local stencil: each cell's tendency reads a few neighbours, and its Jacobian is sparse. In a spectral model it is a global transform: each tendency goes through spherical harmonics or Fourier modes, and every point depends on every other. integrix does not care which, since the steppers only call $f$, so the same `RK3SSP` can step a finite-volume tendency or a spectral one.
