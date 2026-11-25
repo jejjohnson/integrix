@@ -28,7 +28,7 @@ skill = "quadrature-and-expectations-with-integrix"
 
 [units.marches]
 title = "Marches"
-rungs = "① ② ④"
+rungs = "① ② ③ ④"
 skill = "time-stepping-with-integrix"
 
 [[entries]]
@@ -151,6 +151,15 @@ unit = "marches"
 skill = "time-stepping-with-integrix"
 covers = "forcing or control data known at sample times, read between them through any functax 1-D scheme as a diffrax path"
 names = ["integrix.march.SampledPath"]
+
+[[entries]]
+file = "forward-models"
+title = "A diffrax solve as a forward model"
+role = "model"
+unit = "marches"
+skill = "time-stepping-with-integrix"
+covers = "an ODE or an SDE as a forward model with a step and an explicit span, for an assimilation cycle, a filter or a 4D-Var, with its adjoint as a setting"
+names = ["integrix.march.DiffraxForwardModel"]
 
 [[entries]]
 file = "step-functions"
