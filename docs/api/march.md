@@ -8,7 +8,9 @@ Semi-Lagrangian advection reads the old field at departure points: `departure_po
 
 `SampledPath` is a functax fit of samples $(t_k, \vect{u}_k)$ as a diffrax path, so any functax 1-D scheme can force an ODE or drive a CDE. A step that straddles a sample loses order there, so `imex_stepsize_controller(step_ts=path.ts)` makes the adaptive steps land on the samples.
 
-The steppers moved in from finitevolX at `82090a3`, and the IMEX solver and step control from sesmax-core at `f08f59d`, with their interfaces unchanged; the source libraries' tests run against them (gate G1-port).
+`DiffraxForwardModel` is one `diffeqsolve`, of an ODE or an SDE, as a forward model: `step(state, dt)` for an assimilation cycle, and `as_dynamics()` with an explicit span for a filter. Its adjoint is a diffrax adjoint, or a pipekit-cycle spec that `to_diffrax_adjoint` resolves.
+
+The steppers moved in from finitevolX at `82090a3`, the IMEX solver and step control from sesmax-core at `f08f59d`, and `DiffraxForwardModel` from pipekit-jax at `5fb9a12`, with their interfaces unchanged; the source libraries' tests run against them (gate G1-port).
 
 The theory is in the [Marches](../marches/) chapter of the mathematical reference.
 

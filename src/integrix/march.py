@@ -13,6 +13,8 @@ matrix-free IMEX solve, its step control and the explicit CFL bound.
 `semi_lagrangian_step` and `SemiLagrangianSolver` advect a field by reading
 it at departure points that `departure_points` integrates along the flow.
 `SampledPath` makes sampled data a diffrax path, to force an ODE or drive a CDE.
+`DiffraxForwardModel` is one diffrax solve as a forward model, for an
+assimilation cycle or a filter.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from integrix._src.march._erk import (
     rk3_ssp_step,
     rk4_step,
 )
+from integrix._src.march._forward_model import DiffraxForwardModel
 from integrix._src.march._imex import IMEX_SSP2, imex_ssp2_step
 from integrix._src.march._imex_control import (
     imex_solver,
@@ -64,6 +67,7 @@ __all__ = [  # noqa: RUF022
     "AB2Solver",
     "AB3Solver",
     "AbstractStepper",
+    "DiffraxForwardModel",
     "ForwardEulerDfx",
     "IMEX_SSP2",
     "LeapfrogRAFSolver",
