@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.11](https://github.com/jejjohnson/integrix/compare/v0.0.10...v0.0.11) (2026-11-25)
+
+
+### Features
+
+* **march:** add DiffraxForwardModel, moved from pipekit-jax ([#104](https://github.com/jejjohnson/integrix/issues/104)) ([b0c1c5d](https://github.com/jejjohnson/integrix/commit/b0c1c5d8da170ce8eb8d5183cef3760fa9d6a530))
+
 ## [0.0.10](https://github.com/jejjohnson/integrix/compare/v0.0.9...v0.0.10) (2026-11-23)
 
 
