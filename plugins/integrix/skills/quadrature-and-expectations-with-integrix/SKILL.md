@@ -140,6 +140,6 @@ Load a skill only when its card's last line applies.
 
 It uses fewer than 3 names of each unit, so no card. The front door is `gaussx:structured-gaussian-linalg`.
 
-Used by (pointers, not skills to load): gridax, pipekit, plumax, sesmax, vardax.
+Used by (pointers, not skills to load): gridax, pipekit, plumax, sesmax, tracerax, vardax.
 
 <!-- skill-tree:end -->
