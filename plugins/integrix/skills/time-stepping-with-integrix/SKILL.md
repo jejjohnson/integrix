@@ -124,7 +124,7 @@ Open the one the task needs; do not read them all.
 |---|---|---|---|
 | ④ algorithm | [The march and its history steppers](shelf/run-and-steppers.md) | N constant steps of any stepper, the base class of a scheme that carries history, and the three that ship: AB2, filtered leapfrog and split-explicit | 6 |
 | ② strategy | [Single-step schemes as diffrax solvers](shelf/diffrax-solvers.md) | forward Euler, Heun, the SSP Runge–Kutta schemes, classical RK4 and AB3, each a diffrax solver for diffeqsolve or for the march | 7 |
-| ② strategy | [IMEX schemes and the stable step](shelf/imex-and-step-control.md) | a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller and the explicit CFL bound | 5 |
+| ② strategy | [IMEX schemes and the stable step](shelf/imex-and-step-control.md) | a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller, the explicit CFL bound, and the number and lengths of the steps of a span | 7 |
 | ② strategy | [Semi-Lagrangian advection](shelf/semi-lagrangian.md) | a tracer advected past the CFL limit by reading the old field at departure points, with a midpoint trajectory and any functax read-out | 4 |
 | ② strategy | [Sampled forcing and controls](shelf/sampled-paths.md) | forcing or control data known at sample times, read between them through any functax 1-D scheme as a diffrax path | 1 |
 | ③ model | [A diffrax solve as a forward model](shelf/forward-models.md) | an ODE or an SDE as a forward model with a step and an explicit span, for an assimilation cycle, a filter or a 4D-Var, with its adjoint as a setting | 1 |

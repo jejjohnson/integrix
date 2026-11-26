@@ -15,6 +15,8 @@ All of them live in `integrix.march`.
 | `imex_ssp2_step(state, rhs_explicit, rhs_implicit, implicit_solve, dt)` | One IMEX-SSP2 step with your own implicit solve, `implicit_solve(r, gamma_dt)` returning Y with Y − γh f_I(Y) = r. |
 | `imex_solver(*, rtol=1e-4, atol=1e-6, gmres_restart=20)` | A `diffrax.KenCarp3` whose implicit stage is matrix-free (Newton with GMRES). |
 | `imex_stepsize_controller(*, rtol=1e-4, atol=1e-6, step_ts=None)` | An adaptive `diffrax.PIDController` for an IMEX solve, stepping exactly to the times `step_ts` when they are given. |
+| `count_steps(span, step)` | K = ⌈T/Δt⌉ on the host, with a quotient within 10⁻⁹ K of a whole number taken as it, so 2.1 s in 0.15 s is 14 steps; 0 for T = 0. |
+| `step_lengths(span, step)` | The K step lengths in float64: Δt, and T − (K − 1) Δt for the last. |
 | `stable_step(spacing, *, speed=(), diffusivity=(), cfl=1.0)` | The largest stable forward-Euler step for advection and diffusion together: CFL / (∑ᵢ \|uᵢ\| / Δxᵢ + 2 ∑ᵢ Kᵢ / Δxᵢ²). |
 
 ## Use it
@@ -25,10 +27,12 @@ import jax.numpy as jnp
 
 from integrix.march import (
     IMEX_SSP2,
+    count_steps,
     imex_solver,
     imex_ssp2_step,
     imex_stepsize_controller,
     stable_step,
+    step_lengths,
 )
 
 # y′ = −y − 50 y: the slow part explicit, the stiff part implicit
@@ -68,11 +72,16 @@ assert jnp.allclose(y, jnp.exp(-0.11), rtol=1e-3)
 assert jnp.allclose(stable_step((0.5, 1.0), speed=(1.0, 0.0)), 0.5)
 assert jnp.allclose(stable_step((1.0,), speed=(1.0,), diffusivity=(0.5,)), 0.5)
 assert bool(jnp.isinf(stable_step((1.0, 1.0))))  # nothing moves or diffuses
+
+# the steps of a span: no step of zero length, and a shorter last one
+assert count_steps(2.1, 0.15) == 14
+assert step_lengths(12.0, 5.0).tolist() == [5.0, 5.0, 2.0]
 ```
 
 ## Rules
 
 - Order the `MultiTerm` as (explicit, implicit).
+- `count_steps` and `step_lengths` take the span T, not two times: count times from an epoch near the run, because the difference of two Unix-epoch times has already rounded.
 - Give `imex_ssp2_step` the solve the structure allows, such as a tridiagonal solve along columns for vertical diffusion, instead of a general Newton iteration.
 - `stable_step` adds the advective and diffusive rates. Taking the smaller of two separate bounds would allow up to twice the step.
 - `stable_step` is a forward-Euler estimate that catches a step orders of magnitude too large. It is not a stability certificate for a high-order reconstruction or a Runge–Kutta scheme.

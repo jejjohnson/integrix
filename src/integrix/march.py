@@ -59,6 +59,7 @@ from integrix._src.march._split_explicit import (
     SplitExplicitTerms,
     split_explicit_step,
 )
+from integrix._src.march._steps import count_steps, step_lengths
 
 
 # Plain sorted() order, which tests/test_public_api.py checks; ruff's RUF022
@@ -83,6 +84,7 @@ __all__ = [  # noqa: RUF022
     "SplitExplicitTerms",
     "ab2_step",
     "ab3_step",
+    "count_steps",
     "departure_points",
     "euler_step",
     "heun_step",
@@ -96,4 +98,5 @@ __all__ = [  # noqa: RUF022
     "semi_lagrangian_step",
     "split_explicit_step",
     "stable_step",
+    "step_lengths",
 ]
