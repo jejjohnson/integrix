@@ -4,7 +4,8 @@
 through the carry before the last k steps; `Checkpointed` (with
 `checkpointed_scan`) stores the carry every k steps and recomputes between,
 for the exact gradient in O(T/k + k) memory. Both are adjoint options for
-`integrix.march.run`. `to_diffrax_adjoint` resolves an
+`integrix.march.run`, and `scan_for` gives the scan of either for a loop of
+one's own. `to_diffrax_adjoint` resolves an
 adjoint spec (pipekit-cycle's, matched structurally, or a diffrax adjoint) to
 a diffrax adjoint. Adjoints at an optimum (implicit, k-step) are argminax's;
 backward sweeps through a forward run are integrix's.
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 from integrix._src.adjoint._checkpoint import Checkpointed, checkpointed_scan
 from integrix._src.adjoint._diffrax import to_diffrax_adjoint
+from integrix._src.adjoint._scan_for import scan_for
 from integrix._src.adjoint._truncated import Truncated, truncated_scan
 
 
@@ -21,6 +23,7 @@ __all__ = [
     "Checkpointed",
     "Truncated",
     "checkpointed_scan",
+    "scan_for",
     "to_diffrax_adjoint",
     "truncated_scan",
 ]

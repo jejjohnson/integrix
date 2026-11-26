@@ -20,9 +20,10 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree, ScalarLike
 
-from integrix._src.adjoint._checkpoint import Checkpointed, checkpointed_scan
+from integrix._src.adjoint._checkpoint import Checkpointed
 from integrix._src.adjoint._diffrax import to_diffrax_adjoint
-from integrix._src.adjoint._truncated import Truncated, truncated_scan
+from integrix._src.adjoint._scan_for import scan_for
+from integrix._src.adjoint._truncated import Truncated
 from integrix.exceptions import ValidationError
 
 
@@ -199,7 +200,7 @@ def run(
             f"'stepper' must be an AbstractStepper or a diffrax solver, got "
             f"{type(stepper).__name__}"
         )
-    scan = _loop_scan(adjoint, n_steps)
+    scan = _loop_scan(adjoint)
 
     time_dtype = state_time_dtype(y0)
     start = jnp.asarray(t0, dtype=time_dtype)
@@ -295,32 +296,16 @@ def _run_diffrax(
     return jax.tree.map(lambda saved: saved[0], solution.ys)
 
 
-def _loop_scan(adjoint: Any, n_steps: int) -> Callable[..., Any]:
+def _loop_scan(adjoint: Any) -> Callable[..., Any]:
     """The scan the `AbstractStepper` loop runs, for the chosen adjoint."""
-    if adjoint is None:
-        return jax.lax.scan
-    if isinstance(adjoint, Checkpointed):
-        every = adjoint.every
-
-        def scan(body, carry, xs):
-            return checkpointed_scan(body, carry, xs, every=every)
-
-        return scan
-    if isinstance(adjoint, Truncated):
-        # the loop scans N − 1 steps after init; the last k of N are live
-        k = adjoint.k
-
-        def scan(body, carry, xs):
-            if k >= n_steps:
-                return jax.lax.scan(body, carry, xs)
-            return truncated_scan(body, carry, xs, k=k)
-
-        return scan
-    raise ValidationError(
-        f"'adjoint' for an AbstractStepper must be None, Checkpointed or "
-        f"Truncated, got {type(adjoint).__name__} (a diffrax adjoint applies to "
-        f"a diffrax solver only)"
-    )
+    try:
+        return scan_for(adjoint)
+    except ValidationError as err:
+        raise ValidationError(
+            f"'adjoint' for an AbstractStepper must be None, Checkpointed or "
+            f"Truncated, got {type(adjoint).__name__} (a diffrax adjoint applies to "
+            f"a diffrax solver only)"
+        ) from err
 
 
 def _diffrax_adjoint(adjoint: Any, n_steps: int) -> dfx.AbstractAdjoint:

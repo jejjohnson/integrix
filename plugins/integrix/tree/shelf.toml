@@ -181,9 +181,9 @@ title = "Adjoints through a march"
 role = "strategy"
 unit = "marches"
 skill = "time-stepping-with-integrix"
-covers = "the exact gradient in less memory by checkpointing, a gradient cut to the last k steps, their scan forms, and the bridge to a diffrax adjoint"
+covers = "the exact gradient in less memory by checkpointing, a gradient cut to the last k steps, their scan forms, the scan of an adjoint for a loop of your own, and the bridge to a diffrax adjoint"
 names = [
     "integrix.adjoint.Checkpointed", "integrix.adjoint.Truncated",
-    "integrix.adjoint.checkpointed_scan", "integrix.adjoint.to_diffrax_adjoint",
-    "integrix.adjoint.truncated_scan",
+    "integrix.adjoint.checkpointed_scan", "integrix.adjoint.scan_for",
+    "integrix.adjoint.to_diffrax_adjoint", "integrix.adjoint.truncated_scan",
 ]
