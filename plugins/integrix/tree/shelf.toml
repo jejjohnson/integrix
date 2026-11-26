@@ -168,9 +168,10 @@ title = "Pure step functions"
 role = "primitive"
 unit = "marches"
 skill = "time-stepping-with-integrix"
-covers = "one step of each explicit scheme for an autonomous right-hand side, to put inside your own scan"
+covers = "one step of each explicit scheme for an autonomous right-hand side, and one step of any explicit Runge–Kutta tableau with a step per element, to put inside your own scan"
 names = [
     "integrix.march.ab2_step", "integrix.march.ab3_step",
+    "integrix.march.erk_step",
     "integrix.march.euler_step", "integrix.march.heun_step",
     "integrix.march.leapfrog_raf_step", "integrix.march.rk3_ssp_step",
     "integrix.march.rk4_step", "integrix.march.split_explicit_step",
