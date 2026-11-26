@@ -65,7 +65,9 @@ assert jnp.allclose(trajectory[-1], jnp.exp(-1.0), rtol=1e-4)
 ys = jnp.ones(3)
 steps = jnp.array([0.0, 0.1, 0.2])
 moved = erk_step(RK3SSP(), lambda t, y: -y, ys, 0.0, steps)
-assert jnp.allclose(moved, jnp.array([rk3_ssp_step(1.0, f, h) for h in (0.0, 0.1, 0.2)]))
+assert jnp.allclose(
+    moved, jnp.array([rk3_ssp_step(1.0, f, h) for h in (0.0, 0.1, 0.2)])
+)
 
 # multistep: carry the history yourself, starting from f at the first state
 y1, f0, _ = ab2_step(y0, f, 0.1, f(y0))
