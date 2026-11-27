@@ -33,7 +33,9 @@ dependencies = [
     # Unpublished siblings resolve from git, by tag. functax 0.0.13 is the first
     # release whose series fields keep their slopes (functax#162) and whose wide
     # kernels refuse uneven axes (functax#163), both of which SampledPath needs.
-    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.13",
+    # 0.0.15 is pinned so that tracerax, which bins with functax#168, #169 and
+    # #182, resolves the same functax as integrix.
+    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.15",
     "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.12",
 ]
 
