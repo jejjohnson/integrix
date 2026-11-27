@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.12](https://github.com/jejjohnson/integrix/compare/v0.0.11...v0.0.12) (2026-11-27)
+
+
+### Features
+
+* **adjoint:** scan_for gives the scan of an adjoint, and refuses one it does not know ([#114](https://github.com/jejjohnson/integrix/issues/114)) ([8710cc8](https://github.com/jejjohnson/integrix/commit/8710cc8752db0f05ab1e95b9a35efb2a9d7f6f5b))
+* **march:** count_steps and step_lengths split a span into steps without a step of zero length ([#115](https://github.com/jejjohnson/integrix/issues/115)) ([a53acc6](https://github.com/jejjohnson/integrix/commit/a53acc630bf5f3b2599aa355e0217517d78e2aff))
+* **march:** erk_step takes one explicit Runge–Kutta step from any tableau, with time and a step per element ([#116](https://github.com/jejjohnson/integrix/issues/116)) ([926ee02](https://github.com/jejjohnson/integrix/commit/926ee023476e445aae86c74ad6650f3a8ec6eb58))
+
 ## [0.0.11](https://github.com/jejjohnson/integrix/compare/v0.0.10...v0.0.11) (2026-11-25)
 
 
