@@ -15,6 +15,7 @@ All of them live in `integrix.adjoint`.
 | `Truncated(k=1)` | Gradients flow through the carry of the last k steps only. An option for `run` with an `AbstractStepper`. |
 | `checkpointed_scan(f, init, xs, *, every, length=None)` | `jax.lax.scan` that stores the carry only every k steps for reverse mode. |
 | `truncated_scan(f, init, xs, *, k=1, length=None)` | `jax.lax.scan` with the carry's gradient stopped before the last k steps. |
+| `scan_for(adjoint)` | The scan of `None`, `Checkpointed` or `Truncated`, called as `jax.lax.scan` is, for a loop of your own that takes `adjoint=`; anything else raises `ValidationError`. |
 | `to_diffrax_adjoint(spec)` | Resolves an adjoint spec, matched by class name, or a diffrax adjoint, to a `diffrax.AbstractAdjoint`. |
 
 ## Use it
@@ -28,6 +29,7 @@ from integrix.adjoint import (
     Checkpointed,
     Truncated,
     checkpointed_scan,
+    scan_for,
     to_diffrax_adjoint,
     truncated_scan,
 )
@@ -70,6 +72,11 @@ _, ys = checkpointed_scan(step, 0.5, xs, every=3)
 assert jnp.allclose(ys, plain_ys)
 _, ys = truncated_scan(step, 0.5, xs, k=2)
 assert jnp.allclose(ys, plain_ys)
+
+# a loop of your own that takes adjoint= maps it to its scan in one call
+for option in (None, Checkpointed(every=3), Truncated(k=2)):
+    _, ys = scan_for(option)(step, 0.5, xs)
+    assert jnp.allclose(ys, plain_ys)
 
 
 # a spec from another library, matched by its class name
