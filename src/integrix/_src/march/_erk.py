@@ -21,13 +21,16 @@ References:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import diffrax as dfx
 import jax
+import jax.numpy as jnp
 import numpy as np
 from diffrax import RESULTS
 from jaxtyping import PyTree, ScalarLike
+
+from integrix.exceptions import ValidationError
 
 
 __all__ = [
@@ -37,6 +40,7 @@ __all__ = [
     "ForwardEulerDfx",
     "RK2Heun",
     "RK4Classic",
+    "erk_step",
     "euler_step",
     "heun_step",
     "rk3_ssp_step",
@@ -417,3 +421,99 @@ def rk4_step(
         k3,
         k4,
     )
+
+
+def _broadcast_step(step: Any, leaf: Any) -> Any:
+    """h against one leaf: one value per element of its leading axes."""
+    trailing = tuple(range(jnp.ndim(step), jnp.ndim(leaf)))
+    return jnp.expand_dims(step, trailing)
+
+
+def erk_step(
+    solver: dfx.AbstractERK,
+    rhs: Callable[[Any, PyTree], PyTree],
+    y: PyTree,
+    t: Any,
+    dt: Any,
+) -> PyTree:
+    """One step of an explicit Runge–Kutta solver, unrolled from its tableau.
+
+    k_i = f(t + c_i h, y + h ∑_{j<i} a_ij k_j),  y ← y + h ∑_i b_i k_i,
+
+    with a, b, c the solver's Butcher tableau. The stages are a Python loop over
+    the tableau, so the program has s calls of f and no control flow, and both
+    forward and reverse mode work inside a `jax.lax.scan`, where diffrax's
+    ``solver.step`` supports one mode only. A weight that is exactly 0 is
+    skipped, so a stage with weight 0 never reaches the sum.
+
+    Args:
+        solver: An explicit Runge–Kutta solver, of integrix (`RK4Classic`,
+            `RK3SSP`, …) or diffrax (`diffrax.Tsit5`, …), whose tableau is read.
+        rhs: The right-hand side f(t, y). ``t`` has the shape of ``t + dt``.
+        y: The state, any pytree.
+        t: The time at the start of the step: a scalar, or one per element of
+            the leading axes of every leaf.
+        dt: The step h, negative to step backward: a scalar, or one per element
+            of the leading axes of every leaf, as ``t``.
+
+    Returns:
+        The state after the step, with the dtypes of ``y``.
+
+    Raises:
+        ValidationError: If ``solver`` is not explicit Runge–Kutta.
+
+    Examples:
+        One step of the classical RK4 is `rk4_step`:
+
+        >>> import jax.numpy as jnp
+        >>> y = jnp.array([1.0, 2.0])
+        >>> moved = erk_step(RK4Classic(), lambda t, y: -y, y, 0.0, 0.1)
+        >>> bool(jnp.allclose(moved, rk4_step(y, lambda y: -y, 0.1)))
+        True
+
+        A step per element, of a time-dependent right-hand side; Heun's method
+        integrates f(t) = t exactly:
+
+        >>> moved = erk_step(
+        ...     RK2Heun(), lambda t, y: t, y, 1.0, jnp.array([0.5, 2.0])
+        ... )
+        >>> moved.tolist()  # y + t h + h²/2
+        [1.625, 6.0]
+    """
+    if not isinstance(solver, dfx.AbstractERK):
+        raise ValidationError(
+            "'solver' must be explicit Runge–Kutta (diffrax.AbstractERK), got "
+            f"{type(solver).__name__}"
+        )
+    # every explicit Runge–Kutta solver has one
+    tableau = cast(dfx.ButcherTableau, solver.tableau)
+    fractions = [float(tableau.c1), *(float(c) for c in tableau.c)]
+
+    def combine(weights: Any, stages: list[PyTree]) -> PyTree:
+        # y + h ∑_j w_j k_j
+        used = [
+            (float(weight), stage)
+            for weight, stage in zip(weights, stages, strict=True)
+            if float(weight) != 0.0
+        ]
+
+        def leaf_sum(leaf: Any, *ks: Any) -> Any:
+            total = jnp.zeros_like(leaf)
+            for (weight, _), k in zip(used, ks, strict=True):
+                total = total + weight * k
+            step = _broadcast_step(jnp.asarray(dt, leaf.dtype), leaf)
+            return leaf + step * total
+
+        return jax.tree.map(leaf_sum, y, *(stage for _, stage in used))
+
+    stages: list[PyTree] = []
+    for index, fraction in enumerate(fractions):
+        before = [] if index == 0 else tableau.a_lower[index - 1]
+        # k_i = f(t + c_i h, y + h ∑_{j<i} a_ij k_j)
+        stage = rhs(t + fraction * dt, combine(before, stages))
+        # in the state's dtypes
+        stages.append(
+            jax.tree.map(lambda k, leaf: jnp.asarray(k, leaf.dtype), stage, y)
+        )
+    # y ← y + h ∑_i b_i k_i
+    return combine(tableau.b_sol, stages)
