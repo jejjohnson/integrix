@@ -544,8 +544,8 @@ wheels = [
 
 [[package]]
 name = "functax"
-version = "0.0.13"
-source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.13#718ba0648383eab298e9b11bf281be76ff3a374a" }
+version = "0.0.14"
+source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.14#c14c397568b9391d066f070cc68084c92f9b144c" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -708,7 +708,7 @@ wheels = [
 
 [[package]]
 name = "integrix"
-version = "0.0.9"
+version = "0.0.12"
 source = { editable = "." }
 dependencies = [
     { name = "diffrax" },
@@ -761,7 +761,7 @@ requires-dist = [
     { name = "diffrax", specifier = ">=0.7.2,<0.8" },
     { name = "einx", specifier = ">=0.4.3" },
     { name = "equinox", specifier = ">=0.13.8" },
-    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
+    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.14" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12" },
     { name = "jax", specifier = ">=0.10" },
     { name = "jaxlib", specifier = ">=0.10" },
