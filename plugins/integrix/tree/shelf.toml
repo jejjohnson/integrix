@@ -124,8 +124,9 @@ title = "IMEX schemes and the stable step"
 role = "strategy"
 unit = "marches"
 skill = "time-stepping-with-integrix"
-covers = "a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller and the explicit CFL bound"
+covers = "a stiff term taken implicitly beside an explicit one, a matrix-free implicit stage, its step-size controller, the explicit CFL bound, and the number and lengths of the steps of a span"
 names = [
+    "integrix.march.count_steps", "integrix.march.step_lengths",
     "integrix.march.IMEX_SSP2", "integrix.march.imex_solver",
     "integrix.march.imex_ssp2_step", "integrix.march.imex_stepsize_controller",
     "integrix.march.stable_step",
