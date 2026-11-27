@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/jejjohnson/integrix/compare/v0.0.12...v0.0.13) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** functax v0.0.15, so tracerax resolves the functax it bins with ([#118](https://github.com/jejjohnson/integrix/issues/118)) ([9f74872](https://github.com/jejjohnson/integrix/commit/9f7487292231356ad7cc0714c3923177e0ce4a98))
+
 ## [0.0.12](https://github.com/jejjohnson/integrix/compare/v0.0.11...v0.0.12) (2026-11-27)
 
 
